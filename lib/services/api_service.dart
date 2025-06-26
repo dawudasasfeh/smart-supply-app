@@ -1,0 +1,337 @@
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+
+class ApiService {
+  static const String baseUrl = "http://10.0.2.2:5000/api"; // Emulator localhost
+
+  // 🔐 AUTH
+  static Future<Map<String, dynamic>?> login(String email, String password) async {
+    final res = await http.post(
+      Uri.parse("$baseUrl/auth/login"),
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode({"email": email, "password": password}),
+    );
+    return res.statusCode == 200 ? jsonDecode(res.body) : null;
+  }
+
+  static Future<Map<String, dynamic>?> signup(
+      String name, String email, String password, String role) async {
+    final res = await http.post(
+      Uri.parse("$baseUrl/auth/signup"),
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode({
+        "name": name,
+        "email": email,
+        "password": password,
+        "role": role,
+      }),
+    );
+    return res.statusCode == 201 ? jsonDecode(res.body) : null;
+  }
+
+  // 📦 PRODUCTS
+  static Future<List<dynamic>> getProducts(String token) async {
+    final res = await http.get(
+      Uri.parse("$baseUrl/products"),
+      headers: {"Authorization": "Bearer $token"},
+    );
+    return res.statusCode == 200 ? jsonDecode(res.body) : [];
+  }
+
+  static Future<bool> addProduct(String token, Map<String, dynamic> data) async {
+    final res = await http.post(
+      Uri.parse("$baseUrl/products"),
+      headers: {
+        "Authorization": "Bearer $token",
+        "Content-Type": "application/json",
+      },
+      body: jsonEncode(data),
+    );
+    return res.statusCode == 201;
+  }
+
+  static Future<bool> updateProduct(String token, int id, Map<String, dynamic> data) async {
+    final res = await http.put(
+      Uri.parse("$baseUrl/products/$id"),
+      headers: {
+        "Authorization": "Bearer $token",
+        "Content-Type": "application/json",
+      },
+      body: jsonEncode(data),
+    );
+    return res.statusCode == 200;
+  }
+
+  // 🛒 ORDERS
+  static Future<bool> placeOrder({
+    required String token,
+    required int productId,
+    required int distributorId,
+    required int quantity,
+  }) async {
+    final res = await http.post(
+      Uri.parse("$baseUrl/orders"),
+      headers: {
+        "Authorization": "Bearer $token",
+        "Content-Type": "application/json",
+      },
+      body: jsonEncode({
+        "product_id": productId,
+        "distributor_id": distributorId,
+        "quantity": quantity,
+      }),
+    );
+    return res.statusCode == 201;
+  }
+
+  static Future<List<dynamic>> getBuyerOrders(String token) async {
+    final res = await http.get(
+      Uri.parse("$baseUrl/orders/my"),
+      headers: {"Authorization": "Bearer $token"},
+    );
+    return res.statusCode == 200 ? jsonDecode(res.body) : [];
+  }
+
+  static Future<List<dynamic>> getDistributorOrders(String token) async {
+    final res = await http.get(
+      Uri.parse("$baseUrl/orders/incoming"),
+      headers: {"Authorization": "Bearer $token"},
+    );
+    return res.statusCode == 200 ? jsonDecode(res.body) : [];
+  }
+
+  static Future<bool> updateOrderStatus(String token, int id, String status) async {
+    final res = await http.put(
+      Uri.parse("$baseUrl/orders/$id/status"),
+      headers: {
+        "Authorization": "Bearer $token",
+        "Content-Type": "application/json",
+      },
+      body: jsonEncode({"status": status}),
+    );
+    return res.statusCode == 200;
+  }
+
+  // 🎁 OFFERS
+  // Get offers
+static Future<List<dynamic>> getOffers() async {
+  final res = await http.get(Uri.parse("$baseUrl/offers"));
+  return res.statusCode == 200 ? jsonDecode(res.body) : [];
+}
+
+// Add offer
+static Future<bool> addOffer(String token, Map<String, dynamic> data) async {
+  final response = await http.post(
+    Uri.parse("$baseUrl/offers"),
+    headers: {
+      "Authorization": "Bearer $token",
+      "Content-Type": "application/json",
+    },
+    body: jsonEncode(data),
+  );
+
+  print("🔍 Add Offer Request: ${jsonEncode(data)}");
+  print("🔧 Status Code: ${response.statusCode}");
+  print("💬 Body: ${response.body}");
+
+  return response.statusCode == 201;
+}
+
+
+
+// Delete offer
+static Future<bool> deleteOffer(String token, int offerId) async {
+  final res = await http.delete(
+    Uri.parse("$baseUrl/offers/$offerId"),
+    headers: {"Authorization": "Bearer $token"},
+  );
+  return res.statusCode == 204;
+}
+
+
+  // 💬 MESSAGES (CHAT)
+  static Future<List<dynamic>> fetchMessages(int senderId, int receiverId) async {
+    final url = Uri.parse('$baseUrl/messages?senderId=$senderId&receiverId=$receiverId');
+    final res = await http.get(url);
+    return jsonDecode(res.body);
+  }
+
+  static Future<void> sendMessage({
+    required int senderId,
+    required int receiverId,
+    required String senderRole,
+    required String receiverRole,
+    required String message,
+  }) async {
+    final url = Uri.parse('$baseUrl/messages');
+    final res = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'sender_id': senderId,
+        'receiver_id': receiverId,
+        'sender_role': senderRole,
+        'receiver_role': receiverRole,
+        'message': message,
+      }),
+    );
+    if (res.statusCode != 201) {
+      throw Exception('Failed to send message');
+    }
+  }
+
+  static Future<void> startChat({
+    required int senderId,
+    required int receiverId,
+    required String senderRole,
+    required String receiverRole,
+    required String message,
+  }) async {
+    final url = Uri.parse('$baseUrl/messages/start');
+    final res = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'sender_id': senderId,
+        'receiver_id': receiverId,
+        'sender_role': senderRole,
+        'receiver_role': receiverRole,
+        'message': message,
+      }),
+    );
+    if (res.statusCode != 200) {
+      throw Exception("Failed to start chat");
+    }
+  }
+
+  static Future<List<dynamic>> getChatPartners(int userId, String role) async {
+    final url = Uri.parse('$baseUrl/messages/partners?userId=$userId&role=$role');
+    final res = await http.get(url);
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body);
+    } else {
+      throw Exception("Failed to load chat partners");
+    }
+  }
+
+  static Future<List<dynamic>> fetchChatList(int userId) async {
+    final url = Uri.parse('$baseUrl/messages/chat-list?userId=$userId');
+    final res = await http.get(url);
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body);
+    } else {
+      throw Exception('Failed to fetch chat list');
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> getAvailableChatPartners(int myId, String role) async {
+    final opposite = role == 'supermarket' ? 'distributor' : 'supermarket';
+    final url = Uri.parse('$baseUrl/users?role=$opposite&exclude=$myId');
+    final res = await http.get(url);
+    if (res.statusCode == 200) {
+      return List<Map<String, dynamic>>.from(jsonDecode(res.body));
+    } else {
+      throw Exception("Failed to fetch users");
+    }
+  }
+  // 📦 Get orders for delivery man
+static Future<List<dynamic>> getAssignedOrders(int deliveryId) async {
+  final res = await http.get(Uri.parse('$baseUrl/delivery/orders/$deliveryId'));
+  return res.statusCode == 200 ? jsonDecode(res.body) : [];
+}
+
+// ✅ Assign order to delivery man
+static Future<bool> assignOrderToDelivery(int orderId, int deliveryId) async {
+  final response = await http.post(
+    Uri.parse('$baseUrl/delivery/assign'),
+    headers: {"Content-Type": "application/json"},
+    body: jsonEncode({
+      "order_id": orderId,
+      "delivery_id": deliveryId,
+    }),
+  );
+  return response.statusCode == 201;
+}
+
+// 🔄 Update delivery status
+static Future<bool> updateDeliveryStatus({
+  required int orderId,
+  required int deliveryId,
+  required String status,
+}) async {
+  final res = await http.put(
+    Uri.parse('$baseUrl/delivery/status'),
+    headers: {"Content-Type": "application/json"},
+    body: jsonEncode({
+      "order_id": orderId,
+      "delivery_id": deliveryId,
+      "status": status,
+    }),
+  );
+  return res.statusCode == 200;
+}
+
+static Future<bool> verifyDelivery(int orderId, String code) async {
+  final res = await http.post(
+    Uri.parse('$baseUrl/delivery/verify'),
+    headers: {"Content-Type": "application/json"},
+    body: jsonEncode({
+      "order_id": orderId,
+      "delivery_code": code,
+    }),
+  );
+  return res.statusCode == 200;
+}
+
+static Future<Map<String, dynamic>?> placeOrderWithQR({
+  required String token,
+  required int productId,
+  required int distributorId,
+  required int quantity,
+}) async {
+  final res = await http.post(
+    Uri.parse("$baseUrl/orders"),
+    headers: {
+      "Authorization": "Bearer $token",
+      "Content-Type": "application/json",
+    },
+    body: jsonEncode({
+      "product_id": productId,
+      "distributor_id": distributorId,
+      "quantity": quantity,
+    }),
+  );
+
+  if (res.statusCode == 201) {
+    return jsonDecode(res.body); // should include { order_id, delivery_code }
+  } else {
+    return null;
+  }
+}
+
+// ✅ Get all delivery men
+static Future<List<Map<String, dynamic>>> getAvailableDeliveryMen() async {
+  final url = Uri.parse('$baseUrl/users?role=Delivery');
+  final res = await http.get(url);
+
+  if (res.statusCode == 200) {
+    return List<Map<String, dynamic>>.from(jsonDecode(res.body));
+  } else {
+    throw Exception("Failed to fetch delivery personnel");
+  }
+}
+
+
+static Future<List<Map<String, dynamic>>> getUsersByRole(String role) async {
+  final url = Uri.parse('$baseUrl/users?role=$role');
+  final res = await http.get(url);
+  if (res.statusCode == 200) {
+    return List<Map<String, dynamic>>.from(jsonDecode(res.body));
+  } else {
+    throw Exception("Failed to fetch users");
+  }
+}
+
+
+
+}
