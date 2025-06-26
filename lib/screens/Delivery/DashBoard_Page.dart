@@ -38,19 +38,20 @@ class DeliveryDashboard extends StatelessWidget {
               },
             ),
             ListTile(
+              leading: const Icon(Icons.check_circle),
+              title: const Text('Delivered Orders'),
+              onTap: () {
+                Navigator.pushNamed(context, '/deliveredOrders');
+              },
+            ),
+            ListTile(
               leading: const Icon(Icons.settings),
               title: const Text('Settings'),
               onTap: () {
                 Navigator.pushNamed(context, '/settings');
               },
             ),
-            ListTile(
-              leading: const Icon(Icons.logout),
-              title: const Text('Logout'),
-              onTap: () {
-                Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
-              },
-            ),
+            
           ],
         ),
       ),
@@ -80,9 +81,9 @@ class DeliveryDashboard extends StatelessWidget {
                 ),
                 _dashboardButton(
                   context,
-                  icon: Icons.settings,
-                  label: 'Settings',
-                  onTap: () => Navigator.pushNamed(context, '/settings'),
+                  icon: Icons.check_circle,
+                  label: 'Delivered Orders',
+                  onTap: () => Navigator.pushNamed(context, '/deliveredOrders'),
                 ),
               ],
             ),

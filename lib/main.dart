@@ -29,6 +29,7 @@ import 'screens/distributor/deliverymanagement_page.dart';
 // Delivery
 import 'screens/delivery/dashboard_page.dart';
 import 'screens/delivery/assignedorders_page.dart';
+import 'screens/delivery/deliveredorders_page.dart';
 import 'screens/delivery/profile_page.dart';
 
 // Common
@@ -116,6 +117,8 @@ class SupplyChainApp extends StatelessWidget {
             return MaterialPageRoute(builder: (_) => const DeliveryDashboard());
           case '/assignedOrders':
             return MaterialPageRoute(builder: (_) => const AssignedOrdersPage());
+          case '/deliveredOrders':
+            return MaterialPageRoute(builder: (_) => const DeliveredOrdersPage());
           case '/deliveryProfile':
             return MaterialPageRoute(builder: (_) => const DeliveryProfilePage());
 
@@ -161,7 +164,7 @@ class SupplyChainApp extends StatelessWidget {
           // ⚙️ Settings
           case '/settings':
             return MaterialPageRoute(builder: (_) => const SettingsPage());
-
+          
           default:
             return _errorRoute('Page not found: ${settings.name}');
         }

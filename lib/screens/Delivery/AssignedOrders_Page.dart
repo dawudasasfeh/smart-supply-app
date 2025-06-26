@@ -3,7 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/api_service.dart';
 
 class AssignedOrdersPage extends StatefulWidget {
-  const AssignedOrdersPage({Key? key}) : super(key: key);
+  const AssignedOrdersPage({super.key});
 
   @override
   State<AssignedOrdersPage> createState() => _AssignedOrdersPageState();
@@ -24,15 +24,14 @@ class _AssignedOrdersPageState extends State<AssignedOrdersPage> {
     deliveryId = prefs.getInt('user_id');
     if (deliveryId != null) {
       fetchAssignedOrders();
-    } else {
-      debugPrint("⚠️ deliveryId not found in SharedPreferences");
     }
   }
 
   Future<void> fetchAssignedOrders() async {
     if (deliveryId == null) return;
     final orders = await ApiService.getAssignedOrders(deliveryId!);
-    setState(() => assignedOrders = orders);
+    final active = orders.where((o) => o['status'] != 'delivered').toList();
+    setState(() => assignedOrders = active);
   }
 
   Future<void> markDelivered(int orderId) async {
@@ -44,9 +43,8 @@ class _AssignedOrdersPageState extends State<AssignedOrdersPage> {
     );
     if (success) {
       fetchAssignedOrders();
-    } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Failed to update status")),
+        const SnackBar(content: Text("Marked as delivered")),
       );
     }
   }
@@ -62,10 +60,14 @@ class _AssignedOrdersPageState extends State<AssignedOrdersPage> {
             icon: const Icon(Icons.qr_code_scanner),
             onPressed: () => Navigator.pushNamed(context, '/qrScan'),
           ),
+          IconButton(
+            icon: const Icon(Icons.check_circle_outline),
+            onPressed: () => Navigator.pushNamed(context, '/deliveredOrders'),
+          ),
         ],
       ),
       body: assignedOrders.isEmpty
-          ? const Center(child: Text("No assigned orders yet"))
+          ? const Center(child: Text("No assigned orders"))
           : ListView.builder(
               itemCount: assignedOrders.length,
               padding: const EdgeInsets.all(16),
@@ -75,7 +77,7 @@ class _AssignedOrdersPageState extends State<AssignedOrdersPage> {
                   margin: const EdgeInsets.symmetric(vertical: 8),
                   child: ListTile(
                     title: Text("Order #${order['id']}"),
-                    subtitle: Text("Status: ${order['delivery_status'] ?? order['status']}"),
+                    subtitle: Text("Status: ${order['status']}"),
                     trailing: ElevatedButton(
                       onPressed: () => markDelivered(order['id']),
                       style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
