@@ -28,15 +28,49 @@ class ApiService {
     );
     return res.statusCode == 201 ? jsonDecode(res.body) : null;
   }
+  //GET ALL DISTRIBUTORS
+  
+static Future<List<Map<String, dynamic>>> getAllDistributors() async {
+  final url = Uri.parse('$baseUrl/users?role=distributor&exclude=0');
+  final res = await http.get(url);
+  if (res.statusCode == 200) {
+    return List<Map<String, dynamic>>.from(jsonDecode(res.body));
+  } else {
+    throw Exception('Failed to fetch distributors');
+  }
+}
 
   // 📦 PRODUCTS
-  static Future<List<dynamic>> getProducts(String token) async {
-    final res = await http.get(
-      Uri.parse("$baseUrl/products"),
-      headers: {"Authorization": "Bearer $token"},
-    );
-    return res.statusCode == 200 ? jsonDecode(res.body) : [];
+
+static Future<List<dynamic>> getProductsWithOffers({int? distributorId}) async {
+  final query = distributorId != null ? '?withOffers=true&distributorId=$distributorId' : '?withOffers=true';
+  final res = await http.get(Uri.parse('$baseUrl/products$query'));
+  return res.statusCode == 200 ? jsonDecode(res.body) : [];
+}
+
+static Future<List<dynamic>> getDistributors() async {
+  final res = await http.get(Uri.parse('$baseUrl/users?role=distributor'));
+  return res.statusCode == 200 ? jsonDecode(res.body) : [];
+}
+
+
+static Future<List<dynamic>> getProducts(String token, {int? distributorId}) async {
+  final queryParam = distributorId != null ? '?distributor_id=$distributorId' : '';
+  final url = Uri.parse('$baseUrl/products$queryParam');
+  final response = await http.get(
+    url,
+    headers: {'Authorization': 'Bearer $token'},
+  );
+
+  if (response.statusCode == 200) {
+    return jsonDecode(response.body);
+  } else {
+    print('❌ Error fetching products: ${response.body}');
+    throw Exception('Failed to fetch products');
   }
+}
+
+
 
   static Future<bool> addProduct(String token, Map<String, dynamic> data) async {
     final res = await http.post(
@@ -61,6 +95,15 @@ class ApiService {
     );
     return res.statusCode == 200;
   }
+
+  static Future<bool> deleteProduct(String token, int id) async {
+  final res = await http.delete(
+    Uri.parse("$baseUrl/products/$id"),
+    headers: {"Authorization": "Bearer $token"},
+  );
+  return res.statusCode == 204;
+}
+
 
   // 🛒 ORDERS
   static Future<bool> placeOrder({
@@ -114,40 +157,51 @@ class ApiService {
 
   // 🎁 OFFERS
   // Get offers
-static Future<List<dynamic>> getOffers() async {
-  final res = await http.get(Uri.parse("$baseUrl/offers"));
+// Get all current offers (public)
+  static Future<List<dynamic>> getOffers() async {
+    final res = await http.get(Uri.parse('$baseUrl/offers'));
+    return res.statusCode == 200 ? jsonDecode(res.body) : [];
+  }
+// Get offers by distributor
+  static Future<List<dynamic>> getOffersByDistributor(int distributorId) async {
+  final res = await http.get(Uri.parse('$baseUrl/offers?distributorId=$distributorId'));
   return res.statusCode == 200 ? jsonDecode(res.body) : [];
 }
+  // Get offers created by the authenticated distributor
+  static Future<List<dynamic>> getMyOffers(String token) async {
+    final res = await http.get(
+      Uri.parse('$baseUrl/offers/mine'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    return res.statusCode == 200 ? jsonDecode(res.body) : [];
+  }
 
-// Add offer
-static Future<bool> addOffer(String token, Map<String, dynamic> data) async {
-  final response = await http.post(
-    Uri.parse("$baseUrl/offers"),
-    headers: {
-      "Authorization": "Bearer $token",
-      "Content-Type": "application/json",
-    },
-    body: jsonEncode(data),
-  );
+  // Add a new offer
+  static Future<bool> addOffer(String token, Map<String, dynamic> data) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/offers'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode(data),
+    );
 
-  print("🧪 Offer Post Status: ${response.statusCode}");
-  print("🧪 Offer Post Response: ${response.body}");
+    print("🔍 Add Offer Request: ${jsonEncode(data)}");
+    print("🔧 Status Code: ${response.statusCode}");
+    print("💬 Body: ${response.body}");
 
-  return response.statusCode == 201;
-}
+    return response.statusCode == 201;
+  }
 
-
-
-
-
-// Delete offer
-static Future<bool> deleteOffer(String token, int offerId) async {
-  final res = await http.delete(
-    Uri.parse("$baseUrl/offers/$offerId"),
-    headers: {"Authorization": "Bearer $token"},
-  );
-  return res.statusCode == 204;
-}
+  // Delete an offer
+  static Future<bool> deleteOffer(String token, int offerId) async {
+    final res = await http.delete(
+      Uri.parse('$baseUrl/offers/$offerId'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    return res.statusCode == 204;
+  }
 
 
   // 💬 MESSAGES (CHAT)

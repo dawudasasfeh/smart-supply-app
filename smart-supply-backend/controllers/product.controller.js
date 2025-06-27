@@ -1,14 +1,17 @@
+// backend/controllers/product.controller.js
 const {
   createProduct,
   getAllProducts,
   getProductById,
   updateProduct,
   deleteProduct,
+  getProductsWithOffers,
+  getProductsByDistributor,
 } = require('../models/product.model');
 
 const addProduct = async (req, res) => {
   try {
-    const product = { ...req.body, distributor_id: req.user.id }; // user.id from JWT
+    const product = { ...req.body, distributor_id: req.user.id };
     const newProduct = await createProduct(product);
     res.status(201).json(newProduct);
   } catch (err) {
@@ -18,6 +21,19 @@ const addProduct = async (req, res) => {
 
 const getProducts = async (req, res) => {
   try {
+    const distributorId = req.query.distributorId;
+    const withOffers = req.query.withOffers;
+
+    if (withOffers === 'true') {
+      const products = await getProductsWithOffers();
+      return res.json(products);
+    }
+
+    if (distributorId) {
+      const filtered = await getProductsByDistributor(distributorId);
+      return res.json(filtered);
+    }
+
     const products = await getAllProducts();
     res.json(products);
   } catch (err) {
@@ -53,4 +69,10 @@ const remove = async (req, res) => {
   }
 };
 
-module.exports = { addProduct, getProducts, getProduct, update, remove };
+module.exports = {
+  addProduct,
+  getProducts,
+  getProduct,
+  update,
+  remove,
+};

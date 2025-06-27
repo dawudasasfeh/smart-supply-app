@@ -73,6 +73,8 @@ class SupplyChainApp extends StatelessWidget {
             return MaterialPageRoute(builder: (_) => const BrowseProductsPage());
          case '/cart':
             return MaterialPageRoute(builder: (_) => const CartPage());
+          case '/orderHistory':
+            return MaterialPageRoute(builder: (_) => const OrdersPage());
           case '/inventory':
             return MaterialPageRoute(builder: (_) => const InventoryPage());
           case '/offers':
@@ -97,15 +99,17 @@ class SupplyChainApp extends StatelessWidget {
           case '/manageOffers':
             return MaterialPageRoute(builder: (_) => const ManageOffersPage());
           case '/addOffer':
-            if (args is Map<String, dynamic> && args.containsKey('productId')) {
+            final args = settings.arguments as Map<String, dynamic>?;
+            if (args != null) {
               return MaterialPageRoute(
                 builder: (_) => AddOfferPage(
-                  productId: args['productId'],
-                  productName: args['productName'],
+                  productId: args?['productId'],
+                  productName: args?['productName'],
                 ),
               );
             }
             return _errorRoute('Missing product data for AddOfferPage');
+          
           case '/supplierProfile':
             return MaterialPageRoute(builder: (_) => const SupplierProfilePage());
           case '/deliveryManagement':

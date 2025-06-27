@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/api_service.dart';
-import 'addoffer_page.dart';
 
 class ManageProductsPage extends StatefulWidget {
   const ManageProductsPage({super.key});
@@ -11,67 +10,98 @@ class ManageProductsPage extends StatefulWidget {
 }
 
 class _ManageProductsPageState extends State<ManageProductsPage> {
-  List<dynamic> products = [];
+  List<dynamic> myProducts = [];
+  String token = '';
 
   @override
   void initState() {
     super.initState();
-    fetchProducts();
+    fetchMyProducts();
   }
 
-  Future<void> fetchProducts() async {
+  Future<void> fetchMyProducts() async {
     final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('token') ?? '';
-    final result = await ApiService.getProducts(token);
-    setState(() => products = result);
+    token = prefs.getString('token') ?? '';
+    final allProducts = await ApiService.getProducts(token);
+    final userId = prefs.getInt('user_id');
+
+    setState(() {
+      myProducts = allProducts.where((p) => p['distributor_id'] == userId).toList();
+    });
+  }
+
+  void deleteProduct(int id) async {
+    final success = await ApiService.deleteProduct(token, id);
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Product deleted')),
+      );
+      fetchMyProducts();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to delete product')),
+      );
+    }
+  }
+
+  void goToEdit(Map<String, dynamic> product) {
+    Navigator.pushNamed(context, '/editProduct', arguments: product).then((_) => fetchMyProducts());
+  }
+
+  void goToAddOffer(Map<String, dynamic> product) {
+    Navigator.pushNamed(context, '/addOffer', arguments: {
+      'productId': product['id'],
+      'productName': product['name'],
+    });
+  }
+
+  void goToAddProduct() {
+    Navigator.pushNamed(context, '/addProduct').then((_) => fetchMyProducts());
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Manage Products"), backgroundColor: Colors.deepPurple),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => Navigator.pushNamed(context, '/addProduct'),
+      appBar: AppBar(
+        title: const Text("Manage My Products"),
         backgroundColor: Colors.deepPurple,
-        child: const Icon(Icons.add),
       ),
-      body: products.isEmpty
-          ? const Center(child: Text("No products added yet"))
+      body: myProducts.isEmpty
+          ? const Center(child: Text("You haven't added any products yet."))
           : ListView.builder(
-              itemCount: products.length,
               padding: const EdgeInsets.all(16),
+              itemCount: myProducts.length,
               itemBuilder: (context, index) {
-                final product = products[index];
+                final product = myProducts[index];
                 return Card(
                   child: ListTile(
                     title: Text(product['name']),
                     subtitle: Text("Price: \$${product['price']} | Stock: ${product['stock']}"),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.edit, color: Colors.blue),
-                          onPressed: () => Navigator.pushNamed(
-                            context,
-                            '/editProduct',
-                            arguments: product,
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.local_offer, color: Colors.orange),
-                          onPressed: () {
-                            Navigator.pushNamed(context, '/addOffer', arguments: {
-                              'productId': product['id'],
-                              'productName': product['name'],
-                            });
-                          },
-                        ),
+                    trailing: PopupMenuButton<String>(
+                      onSelected: (value) {
+                        if (value == 'edit') {
+                          goToEdit(product);
+                        } else if (value == 'offer') {
+                          goToAddOffer(product);
+                        } else if (value == 'delete') {
+                          deleteProduct(product['id']);
+                        }
+                      },
+                      itemBuilder: (context) => [
+                        const PopupMenuItem(value: 'edit', child: Text("Edit")),
+                        const PopupMenuItem(value: 'offer', child: Text("Make Offer")),
+                        const PopupMenuItem(value: 'delete', child: Text("Delete")),
                       ],
                     ),
                   ),
                 );
               },
             ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: goToAddProduct,
+        backgroundColor: Colors.deepPurple,
+        child: const Icon(Icons.add),
+      ),
     );
   }
 }
