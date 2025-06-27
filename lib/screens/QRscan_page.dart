@@ -18,7 +18,7 @@ class _QRScanPageState extends State<QRScanPage> {
     if (isProcessing) return;
     setState(() => isProcessing = true);
 
-    final prefs = await SharedPreferences.getInstance();
+    await SharedPreferences.getInstance();
     // Assuming user_id saved at login (not used here directly but can be used if needed)
     // final userId = prefs.getInt('user_id');
 
