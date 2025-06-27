@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application_2/screens/EditProfile_page.dart';
+import 'package:flutter_application_2/services/api_service.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart';
@@ -31,22 +33,27 @@ class _DeliveryProfilePageState extends State<DeliveryProfilePage> with SingleTi
     super.dispose();
   }
 
-  Future<void> _loadProfileData() async {
-    final prefs = await SharedPreferences.getInstance();
-    // Ready for you to add delivery-specific fields here
+Future<void> _loadProfileData() async {
+  final prefs = await SharedPreferences.getInstance();
+  final token = prefs.getString('token') ?? '';
+  try {
+    final profile = await ApiService.fetchUserProfile(token);
     final data = {
       'username': prefs.getString('username') ?? 'Delivery',
-      'fullName': prefs.getString('fullName') ?? 'Delivery Person',
-      'role': prefs.getString('role') ?? 'Delivery',
-      'token': prefs.getString('token') ?? '',
-      'phone': prefs.getString('phone') ?? 'N/A',
-      'vehicleType': prefs.getString('vehicleType') ?? 'N/A',
-      'licensePlate': prefs.getString('licensePlate') ?? 'N/A',
-      'memberSince': prefs.getString('memberSince') ?? '2022-01-01',
+      'fullName': profile['full_name'] ?? 'Delivery Person',
+      'role': prefs.getString('role') ?? '',
+      'token': token,
+      'phone': profile['phone'] ?? 'N/A',
+      'vehicleType': profile['vehicle_type'] ?? 'N/A',
+      'licensePlate': profile['license_plate'] ?? 'N/A',
+      'memberSince': profile['created_at']?.split('T').first ?? 'N/A',
     };
-    await Future.delayed(const Duration(milliseconds: 400));
-    if (mounted) setState(() => profileData = data);
+    setState(() => profileData = data.cast<String, String>());
+  } catch (e) {
+    debugPrint('Delivery profile error: $e');
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error loading profile')));
   }
+}
 
   void _copyToClipboard(String text, String label) {
     Clipboard.setData(ClipboardData(text: text));
@@ -173,10 +180,13 @@ class _DeliveryProfilePageState extends State<DeliveryProfilePage> with SingleTi
             elevation: 8,
           ),
           onPressed: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text("Edit profile not implemented yet")),
-            );
-          },
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => EditProfilePage(role: profileData!['role']!),
+            ),
+          );
+        },
         ),
       ),
     );

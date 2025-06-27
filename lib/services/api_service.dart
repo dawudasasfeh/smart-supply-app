@@ -14,21 +14,51 @@ class ApiService {
     return res.statusCode == 200 ? jsonDecode(res.body) : null;
   }
 
-  static Future<Map<String, dynamic>?> signup(
-      String name, String email, String password, String role) async {
-    final res = await http.post(
-      Uri.parse("$baseUrl/auth/signup"),
-      headers: {"Content-Type": "application/json"},
-      body: jsonEncode({
-        "name": name,
-        "email": email,
-        "password": password,
-        "role": role,
-      }),
-    );
-    return res.statusCode == 201 ? jsonDecode(res.body) : null;
+static Future<Map<String, dynamic>?> signup(Map<String, dynamic> data) async {
+  final res = await http.post(
+    Uri.parse("$baseUrl/auth/signup"),
+    headers: {"Content-Type": "application/json"},
+    body: jsonEncode(data),
+  );
+  if (res.statusCode == 201) {
+    return jsonDecode(res.body);
+  } else {
+    print('❌ Signup failed: ${res.statusCode}');
+    print('💬 ${res.body}');
+    return null;
   }
-  //GET ALL DISTRIBUTORS
+}
+
+static Future<Map<String, dynamic>> fetchUserProfile(String token) async {
+  final res = await http.get(
+    Uri.parse('$baseUrl/profile/me'),
+    headers: {'Authorization': 'Bearer $token'},
+  );
+  if (res.statusCode == 200) {
+    return jsonDecode(res.body);
+  } else {
+    throw Exception('Failed to load profile');
+  }
+}
+
+static Future<void> updateProfile(String token, Map<String, dynamic> data, String role) async {
+  final url = Uri.parse('$baseUrl/profile/me');
+  final res = await http.put(
+    url,
+    headers: {
+      'Authorization': 'Bearer $token',
+      'Content-Type': 'application/json',
+    },
+    body: jsonEncode(data),
+  );
+  if (res.statusCode != 200) {
+    throw Exception(jsonDecode(res.body)['error'] ?? 'Failed to update');
+  }
+}
+
+
+
+//GET ALL DISTRIBUTORS
   
 static Future<List<Map<String, dynamic>>> getAllDistributors() async {
   final url = Uri.parse('$baseUrl/users?role=distributor&exclude=0');

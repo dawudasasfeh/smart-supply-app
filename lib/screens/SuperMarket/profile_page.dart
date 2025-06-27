@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application_2/screens/EditProfile_page.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_application_2/services/api_service.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -11,7 +13,7 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStateMixin {
-  Map<String, String>? profileData;
+  Map<String, dynamic>? profileData;
   bool showFullToken = false;
   late AnimationController _avatarPulseController;
 
@@ -32,19 +34,25 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
   }
 
   Future<void> _loadProfileData() async {
-    final prefs = await SharedPreferences.getInstance();
+  final prefs = await SharedPreferences.getInstance();
+  final token = prefs.getString('token') ?? '';
+  try {
+    final profile = await ApiService.fetchUserProfile(token);
     final data = {
       'username': prefs.getString('username') ?? 'User',
-      'email': prefs.getString('email') ?? 'user@example.com',
-      'role': prefs.getString('role') ?? 'Customer',
-      'token': prefs.getString('token') ?? '',
-      'memberSince': prefs.getString('memberSince') ?? '2023-01-01',
-      'phone': prefs.getString('phone') ?? 'N/A',
-      'address': prefs.getString('address') ?? 'N/A',
+      'email': profile['contact_email'] ?? prefs.getString('email') ?? '',
+      'role': prefs.getString('role') ?? '',
+      'token': token,
+      'memberSince': profile['created_at']?.split('T').first ?? 'N/A',
+      'phone': profile['contact_phone'] ?? 'N/A',
+      'address': profile['address'] ?? 'N/A',
     };
-    await Future.delayed(const Duration(milliseconds: 400));
-    if (mounted) setState(() => profileData = data);
+    setState(() => profileData = data);
+  } catch (e) {
+    debugPrint('Profile load error: $e');
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error loading profile')));
   }
+}
 
   void _copyToClipboard(String text, String label) {
     Clipboard.setData(ClipboardData(text: text));
@@ -170,15 +178,18 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
             shadowColor: accentColor != null ? accentColor.withOpacity(0.4) : null,
             elevation: 8,
           ),
-          onPressed: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text("Edit profile not implemented yet")),
-            );
-          },
-        ),
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => EditProfilePage(role: profileData!['role']!),
+            ),
+          );
+        },
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildAnimatedAvatar(String username, Color accentColor, Color textPrimary) {
     return Center(

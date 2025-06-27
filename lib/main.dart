@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 // Auth
+import 'screens/EditProfile_page.dart';
 import 'screens/login_page.dart';
 import 'screens/signup_page.dart';
 
@@ -133,6 +134,8 @@ class SupplyChainApp extends StatelessWidget {
             return MaterialPageRoute(builder: (_) => const DeliveredOrdersPage());
           case '/deliveryProfile':
             return MaterialPageRoute(builder: (_) => const DeliveryProfilePage());
+          case '/editProfile':
+            return MaterialPageRoute(builder: (_) => const EditProfilePage(role: ''));
 
           // 💬 Chat
           case '/chat':

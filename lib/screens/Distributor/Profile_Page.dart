@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application_2/screens/EditProfile_page.dart';
+import 'package:flutter_application_2/services/api_service.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart';
@@ -32,22 +34,27 @@ class _DistributorProfilePageState extends State<DistributorProfilePage>
     super.dispose();
   }
 
-  Future<void> _loadProfileData() async {
-    final prefs = await SharedPreferences.getInstance();
-    // Ready for you to add distributor specific keys here
+Future<void> _loadProfileData() async {
+  final prefs = await SharedPreferences.getInstance();
+  final token = prefs.getString('token') ?? '';
+  try {
+    final profile = await ApiService.fetchUserProfile(token);
     final data = {
       'username': prefs.getString('username') ?? 'Distributor',
-      'companyName': prefs.getString('companyName') ?? 'My Company',
-      'email': prefs.getString('email') ?? 'distributor@example.com',
-      'role': prefs.getString('role') ?? 'Distributor',
-      'token': prefs.getString('token') ?? '',
-      'phone': prefs.getString('phone') ?? 'N/A',
-      'address': prefs.getString('address') ?? 'N/A',
-      'memberSince': prefs.getString('memberSince') ?? '2022-01-01',
+      'companyName': profile['company_name'] ?? 'My Company',
+      'email': profile['email'] ?? prefs.getString('email') ?? '',
+      'role': prefs.getString('role') ?? '',
+      'token': token,
+      'phone': profile['phone'] ?? 'N/A',
+      'address': profile['address'] ?? 'N/A',
+      'memberSince': profile['created_at']?.split('T').first ?? 'N/A',
     };
-    await Future.delayed(const Duration(milliseconds: 400));
-    if (mounted) setState(() => profileData = data);
+    setState(() => profileData = data.cast<String, String>());
+  } catch (e) {
+    debugPrint('Distributor profile error: $e');
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error loading profile')));
   }
+}
 
   void _copyToClipboard(String text, String label) {
     Clipboard.setData(ClipboardData(text: text));
@@ -174,8 +181,11 @@ class _DistributorProfilePageState extends State<DistributorProfilePage>
             elevation: 8,
           ),
           onPressed: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text("Edit profile not implemented yet")),
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => EditProfilePage(role: profileData!['role']!),
+              ),
             );
           },
         ),
