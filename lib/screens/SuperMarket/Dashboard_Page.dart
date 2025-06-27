@@ -90,10 +90,7 @@ class SupermarketDashboard extends StatelessWidget {
                   context,
                   '/chatList',
                   arguments: {
-                    'role': 'supermarket',
-                    'chatUsers': [
-                      {'id': 2, 'name': 'Distributor A', 'lastMessage': 'Shipped.'},
-                    ],
+                    'role': 'supermarket', // ✅ Pass only the role
                   },
                 );
               },

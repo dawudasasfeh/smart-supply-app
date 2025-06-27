@@ -130,12 +130,13 @@ static Future<bool> addOffer(String token, Map<String, dynamic> data) async {
     body: jsonEncode(data),
   );
 
-  print("🔍 Add Offer Request: ${jsonEncode(data)}");
-  print("🔧 Status Code: ${response.statusCode}");
-  print("💬 Body: ${response.body}");
+  print("🧪 Offer Post Status: ${response.statusCode}");
+  print("🧪 Offer Post Response: ${response.body}");
 
   return response.statusCode == 201;
 }
+
+
 
 
 
@@ -204,26 +205,28 @@ static Future<bool> deleteOffer(String token, int offerId) async {
     }
   }
 
-  static Future<List<dynamic>> getChatPartners(int userId, String role) async {
-    final url = Uri.parse('$baseUrl/messages/partners?userId=$userId&role=$role');
-    final res = await http.get(url);
-    if (res.statusCode == 200) {
-      return jsonDecode(res.body);
-    } else {
-      throw Exception("Failed to load chat partners");
-    }
+ static Future<List<dynamic>> getChatPartners(int userId, String role) async {
+  final url = Uri.parse('$baseUrl/messages/partners?userId=$userId&role=$role');
+  final res = await http.get(url);
+  print("PARTNER RESPONSE: ${res.body}");
+  if (res.statusCode == 200) {
+    return jsonDecode(res.body);
+  } else {
+    throw Exception("Failed to load chat partners");
   }
+}
+ static Future<List<dynamic>> fetchChatList(int userId) async {
+    final uri = Uri.parse('$baseUrl/messages/partners')
+        .replace(queryParameters: {'userId': userId.toString(), 'role': 'supermarket'}); // or 'distributor'
 
-  static Future<List<dynamic>> fetchChatList(int userId) async {
-    final url = Uri.parse('$baseUrl/messages/chat-list?userId=$userId');
-    final res = await http.get(url);
+    final res = await http.get(uri);
     if (res.statusCode == 200) {
       return jsonDecode(res.body);
     } else {
+      print("⚠️ fetchChatList failed: ${res.statusCode} ${res.body}");
       throw Exception('Failed to fetch chat list');
     }
   }
-
   static Future<List<Map<String, dynamic>>> getAvailableChatPartners(int myId, String role) async {
     final opposite = role == 'supermarket' ? 'distributor' : 'supermarket';
     final url = Uri.parse('$baseUrl/users?role=$opposite&exclude=$myId');

@@ -1,19 +1,18 @@
 class CartManager {
   static final CartManager _instance = CartManager._internal();
   factory CartManager() => _instance;
+
   CartManager._internal();
 
-  final List<Map<String, dynamic>> _cart = [];
+  final List<Map<String, dynamic>> _cartItems = [];
 
-  List<Map<String, dynamic>> get cartItems => List.unmodifiable(_cart);
+  List<Map<String, dynamic>> get cartItems => _cartItems;
 
   void addItem(Map<String, dynamic> item) {
-    _cart.add(item);
+    _cartItems.add(item);
   }
 
   void clearCart() {
-    _cart.clear();
+    _cartItems.clear();
   }
-
-  bool get isEmpty => _cart.isEmpty;
 }

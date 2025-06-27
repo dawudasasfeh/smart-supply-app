@@ -25,7 +25,7 @@ import 'screens/distributor/addoffer_page.dart';
 import 'screens/distributor/chat_page.dart';
 import 'screens/distributor/profile_page.dart';
 import 'screens/distributor/deliverymanagement_page.dart';
-
+import 'screens/distributor/AssignedOrdersDetails_page.dart';
 // Delivery
 import 'screens/delivery/dashboard_page.dart';
 import 'screens/delivery/assignedorders_page.dart';
@@ -35,6 +35,7 @@ import 'screens/delivery/profile_page.dart';
 // Common
 import 'screens/settings_page.dart';
 import 'screens/chat_list_page.dart';
+import 'screens/addchat_page.dart';
 import 'screens/qrgenerator_page.dart';
 import 'screens/QRscan_page.dart';
 
@@ -72,8 +73,6 @@ class SupplyChainApp extends StatelessWidget {
             return MaterialPageRoute(builder: (_) => const BrowseProductsPage());
          case '/cart':
             return MaterialPageRoute(builder: (_) => const CartPage());
-          case '/orderHistory':
-            return MaterialPageRoute(builder: (_) => const OrdersPage());
           case '/inventory':
             return MaterialPageRoute(builder: (_) => const InventoryPage());
           case '/offers':
@@ -111,8 +110,11 @@ class SupplyChainApp extends StatelessWidget {
             return MaterialPageRoute(builder: (_) => const SupplierProfilePage());
           case '/deliveryManagement':
             return MaterialPageRoute(builder: (_) => const DeliveryManagementPage());
-
-          // 🚚 Delivery
+          case '/assignedOrdersDetails':
+            final deliveryId = settings.arguments as int;
+            return MaterialPageRoute(
+              builder: (_) => AssignedOrdersDetailsPage(deliveryId: deliveryId),
+            );         // 🚚 Delivery
           case '/deliveryDashboard':
             return MaterialPageRoute(builder: (_) => const DeliveryDashboard());
           case '/assignedOrders':
@@ -144,6 +146,14 @@ class SupplyChainApp extends StatelessWidget {
               );
             }
             return _errorRoute('Missing role for ChatListPage');
+          case '/addchat':
+            if (args is Map<String, dynamic> && args.containsKey('role')) {
+              return MaterialPageRoute(
+                builder: (_) => AddChatPage(role: args['role']),
+              );
+            }
+            return _errorRoute('Missing role for AddChatPage');
+
 
           // 📦 QR
           case '/qrGenerate':

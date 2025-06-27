@@ -19,7 +19,7 @@ class _QRScanPageState extends State<QRScanPage> {
     setState(() => isProcessing = true);
 
     final prefs = await SharedPreferences.getInstance();
-    final deliveryId = prefs.getInt('user_id'); // must be saved at login
+    prefs.getInt('user_id'); // must be saved at login
 
     try {
       final parts = code.split(':');

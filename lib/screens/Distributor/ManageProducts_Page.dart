@@ -60,15 +60,10 @@ class _ManageProductsPageState extends State<ManageProductsPage> {
                         IconButton(
                           icon: const Icon(Icons.local_offer, color: Colors.orange),
                           onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => AddOfferPage(
-                                  productId: product['id'],
-                                  productName: product['name'],
-                                ),
-                              ),
-                            );
+                            Navigator.pushNamed(context, '/addOffer', arguments: {
+                              'productId': product['id'],
+                              'productName': product['name'],
+                            });
                           },
                         ),
                       ],

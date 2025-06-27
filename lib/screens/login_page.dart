@@ -32,6 +32,7 @@ class _LoginPageState extends State<LoginPage> {
       await prefs.setString('role', response['user']['role']);
       await prefs.setInt('user_id', response['user']['id']);
       
+      
       final role = response['user']['role'];
       if (role == 'Supermarket') {
         Navigator.pushReplacementNamed(context, '/supermarketDashboard');

@@ -2,12 +2,13 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db');
 
-// ✅ Send a new message
+// ✅ Send message
 router.post('/', async (req, res) => {
   const { sender_id, receiver_id, sender_role, receiver_role, message } = req.body;
   try {
     await pool.query(
-      'INSERT INTO messages (sender_id, receiver_id, sender_role, receiver_role, message) VALUES ($1, $2, $3, $4, $5)',
+      `INSERT INTO messages (sender_id, receiver_id, sender_role, receiver_role, message)
+       VALUES ($1, $2, $3, $4, $5)`,
       [sender_id, receiver_id, sender_role, receiver_role, message]
     );
     res.status(201).json({ status: 'Message sent' });
@@ -21,7 +22,10 @@ router.get('/', async (req, res) => {
   const { senderId, receiverId } = req.query;
   try {
     const result = await pool.query(
-      'SELECT * FROM messages WHERE (sender_id = $1 AND receiver_id = $2) OR (sender_id = $2 AND receiver_id = $1) ORDER BY timestamp',
+      `SELECT * FROM messages
+       WHERE (sender_id = $1 AND receiver_id = $2)
+          OR (sender_id = $2 AND receiver_id = $1)
+       ORDER BY timestamp`,
       [senderId, receiverId]
     );
     res.json(result.rows);
@@ -30,7 +34,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-// ✅ Fetch chat partners for a user
+// ✅ Fetch chat partners
 router.get('/partners', async (req, res) => {
   const { userId, role } = req.query;
   try {
@@ -40,7 +44,9 @@ router.get('/partners', async (req, res) => {
          SELECT m.receiver_id AS other_id, u.name, m.message, m.timestamp
          FROM messages m JOIN users u ON u.id = m.receiver_id
          WHERE m.sender_id = $1 AND m.sender_role = $2
+
          UNION
+
          SELECT m.sender_id AS other_id, u.name, m.message, m.timestamp
          FROM messages m JOIN users u ON u.id = m.sender_id
          WHERE m.receiver_id = $1 AND m.receiver_role = $2
@@ -55,7 +61,7 @@ router.get('/partners', async (req, res) => {
   }
 });
 
-// ✅ Start a new chat with first message
+// ✅ Start chat
 router.post('/start', async (req, res) => {
   const { sender_id, receiver_id, sender_role, receiver_role, message } = req.body;
   if (!sender_id || !receiver_id || !message) {
@@ -63,7 +69,8 @@ router.post('/start', async (req, res) => {
   }
   try {
     await pool.query(
-      'INSERT INTO messages (sender_id, receiver_id, sender_role, receiver_role, message) VALUES ($1, $2, $3, $4, $5)',
+      `INSERT INTO messages (sender_id, receiver_id, sender_role, receiver_role, message)
+       VALUES ($1, $2, $3, $4, $5)`,
       [sender_id, receiver_id, sender_role, receiver_role, message]
     );
     res.json({ status: 'Chat started' });
@@ -73,20 +80,3 @@ router.post('/start', async (req, res) => {
 });
 
 module.exports = router;
-
-// 📁 routes/users.js
-const userRouter = express.Router();
-
-// ✅ Get users of opposite role excluding self
-userRouter.get('/', async (req, res) => {
-  const { role, exclude } = req.query;
-  if (!role || !exclude) return res.status(400).json({ error: 'Missing query' });
-  try {
-    const result = await pool.query('SELECT id, name FROM users WHERE role = $1 AND id != $2', [role, exclude]);
-    res.json(result.rows);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-module.exports = userRouter;

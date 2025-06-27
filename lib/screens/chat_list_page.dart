@@ -4,7 +4,7 @@ import '../../services/api_service.dart';
 import 'addchat_page.dart';
 
 class ChatListPage extends StatefulWidget {
-  final String role; // "supermarket" or "distributor"
+  final String role;
   const ChatListPage({super.key, required this.role});
 
   @override
@@ -15,7 +15,7 @@ class _ChatListPageState extends State<ChatListPage> {
   List<dynamic> chatUsers = [];
   bool loading = true;
   int myId = 0;
-
+  
   @override
   void initState() {
     super.initState();
@@ -24,7 +24,7 @@ class _ChatListPageState extends State<ChatListPage> {
 
   Future<void> fetchChatPartners() async {
     final prefs = await SharedPreferences.getInstance();
-    myId = prefs.getInt('userId') ?? 0;
+    myId = prefs.getInt('user_id') ?? 0;
     try {
       final data = await ApiService.getChatPartners(myId, widget.role);
       setState(() {
@@ -40,19 +40,13 @@ class _ChatListPageState extends State<ChatListPage> {
   }
 
   void openChat(Map<String, dynamic> partner) {
-    if (widget.role == 'supermarket') {
-      Navigator.pushNamed(
-        context,
-        '/chat',
-        arguments: {'distributorId': partner['id']},
-      );
-    } else if (widget.role == 'distributor') {
-      Navigator.pushNamed(
-        context,
-        '/supplierChat',
-        arguments: {'supermarketId': partner['id']},
-      );
-    }
+    final route = widget.role == 'supermarket' ? '/chat' : '/supplierChat';
+    final argKey = widget.role == 'supermarket' ? 'distributorId' : 'supermarketId';
+    Navigator.pushNamed(
+      context,
+      route,
+      arguments: {argKey: partner['id']},
+    );
   }
 
   @override
@@ -62,7 +56,6 @@ class _ChatListPageState extends State<ChatListPage> {
         title: const Text("Chats"),
         backgroundColor: Colors.deepPurple,
       ),
-      backgroundColor: Colors.grey[100],
       body: loading
           ? const Center(child: CircularProgressIndicator())
           : chatUsers.isEmpty
@@ -77,7 +70,6 @@ class _ChatListPageState extends State<ChatListPage> {
                       leading: const CircleAvatar(child: Icon(Icons.person)),
                       title: Text(partner['name'] ?? 'User'),
                       subtitle: Text(partner['lastmessage'] ?? 'No messages'),
-                      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
                       onTap: () => openChat(partner),
                     );
                   },
@@ -92,7 +84,7 @@ class _ChatListPageState extends State<ChatListPage> {
               builder: (_) => AddChatPage(role: widget.role),
             ),
           );
-          fetchChatPartners(); // refresh after adding new chat
+          fetchChatPartners();
         },
       ),
     );

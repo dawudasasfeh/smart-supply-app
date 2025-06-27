@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../cartmanager_page.dart';
+import '../cartmanager_page.dart'; // ✅ assuming you already have this
 import '../../services/api_service.dart';
 
 class CartPage extends StatefulWidget {
@@ -29,7 +29,6 @@ class _CartPageState extends State<CartPage> {
 
   Future<void> placeOrders() async {
     setState(() => isLoading = true);
-
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token') ?? '';
     final cart = CartManager().cartItems;
@@ -44,8 +43,7 @@ class _CartPageState extends State<CartPage> {
         distributorId: item['distributor_id'],
         quantity: item['quantity'],
       );
-
-      if (res != null && res.containsKey('order_id') && res.containsKey('delivery_code')) {
+      if (res != null) {
         lastOrderId = res['order_id'];
         lastDeliveryCode = res['delivery_code'];
       }
@@ -54,21 +52,12 @@ class _CartPageState extends State<CartPage> {
     CartManager().clearCart();
     setState(() => isLoading = false);
 
-    if (!mounted || lastOrderId == null || lastDeliveryCode == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Failed to place orders or generate QR")),
-      );
-      return;
-    }
+    if (!mounted || lastOrderId == null || lastDeliveryCode == null) return;
 
-    Navigator.pushNamed(
-      context,
-      '/qrGenerate',
-      arguments: {
-        'orderId': lastOrderId,
-        'deliveryCode': lastDeliveryCode,
-      },
-    );
+    Navigator.pushNamed(context, '/qrGenerate', arguments: {
+      'orderId': lastOrderId,
+      'deliveryCode': lastDeliveryCode,
+    });
   }
 
   @override
@@ -79,12 +68,6 @@ class _CartPageState extends State<CartPage> {
       appBar: AppBar(
         title: const Text("My Cart"),
         backgroundColor: Colors.deepPurple,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () => Navigator.pushNamed(context, '/paymentSettings'),
-          )
-        ],
       ),
       body: cart.isEmpty
           ? const Center(child: Text("Your cart is empty."))
@@ -98,9 +81,9 @@ class _CartPageState extends State<CartPage> {
                       return Card(
                         margin: const EdgeInsets.all(10),
                         child: ListTile(
-                          title: Text(item['name']),
+                          title: Text(item['name'] ?? item['product_name']),
                           subtitle: Text("Qty: ${item['quantity']}"),
-                          trailing: Text("\$${item['price']}"),
+                          trailing: Text("\$${item['price'] ?? item['discount_price']}"),
                         ),
                       );
                     },
@@ -126,8 +109,7 @@ class _CartPageState extends State<CartPage> {
                               ? const SizedBox(
                                   height: 18,
                                   width: 18,
-                                  child: CircularProgressIndicator(
-                                      strokeWidth: 2, color: Colors.white),
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                                 )
                               : const Icon(Icons.check),
                           label: const Text("Place Order"),

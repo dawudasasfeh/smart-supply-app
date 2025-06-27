@@ -90,9 +90,6 @@ class DistributorDashboard extends StatelessWidget {
                   '/chatList',
                   arguments: {
                     'role': 'distributor',
-                    'chatUsers': [
-                      {'id': 4, 'name': 'Retailer X', 'lastMessage': 'Confirmed.'},
-                    ],
                   },
                 );
               },
