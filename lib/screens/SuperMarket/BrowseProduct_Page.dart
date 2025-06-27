@@ -31,17 +31,36 @@ class _BrowseProductsPageState extends State<BrowseProductsPage> {
   Future<void> fetchData() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token') ?? '';
-
     final allProducts = await ApiService.getProducts(token);
     final currentOffers = await ApiService.getOffers();
 
+    List<dynamic> filtered = allProducts.where((p) {
+      return selectedDistributorId == null || p['distributor_id'] == selectedDistributorId;
+    }).toList();
+
+    // Sort so zero-stock products go at the bottom, others alphabetically by name
+    filtered.sort((a, b) {
+      int stockA = a['stock'] ?? 0;
+      int stockB = b['stock'] ?? 0;
+
+      int zeroSortA = stockA == 0 ? 1 : 0;
+      int zeroSortB = stockB == 0 ? 1 : 0;
+
+      if (zeroSortA != zeroSortB) {
+        return zeroSortA.compareTo(zeroSortB);
+      }
+
+      return (a['name'] ?? '').toString().compareTo((b['name'] ?? '').toString());
+    });
+
     setState(() {
       offers = currentOffers;
-      products = allProducts.where((p) {
-        return selectedDistributorId == null ||
-            p['distributor_id'] == selectedDistributorId;
-      }).toList();
+      products = filtered;
     });
+  }
+
+  Future<void> refreshProducts() async {
+    await fetchData();
   }
 
   void addToCart(Map<String, dynamic> product) {
@@ -50,9 +69,7 @@ class _BrowseProductsPageState extends State<BrowseProductsPage> {
       orElse: () => null,
     );
 
-    final price = matchedOffer != null
-        ? matchedOffer['discount_price']
-        : product['price'];
+    final price = matchedOffer != null ? matchedOffer['discount_price'] : product['price'];
 
     final cartItem = {
       'id': product['id'],
@@ -60,6 +77,7 @@ class _BrowseProductsPageState extends State<BrowseProductsPage> {
       'price': price,
       'quantity': 1,
       'distributor_id': product['distributor_id'],
+      'stock': product['stock'] ?? 1,
     };
 
     CartManager().addItem(cartItem);
@@ -87,7 +105,12 @@ class _BrowseProductsPageState extends State<BrowseProductsPage> {
         actions: [
           IconButton(
             icon: const Icon(Icons.shopping_cart),
-            onPressed: () => Navigator.pushNamed(context, '/cart'),
+            onPressed: () async {
+              final result = await Navigator.pushNamed(context, '/cart');
+              if (result == 'order_placed') {
+                await refreshProducts();
+              }
+            },
           )
         ],
       ),
@@ -131,69 +154,95 @@ class _BrowseProductsPageState extends State<BrowseProductsPage> {
                       );
 
                       return Card(
-                        child: ListTile(
-                          title: Row(
-                            children: [
-                              Expanded(child: Text(product['name'])),
-                              if (offer != null)
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 4,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: Colors.redAccent,
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                      child: const Text(
-                                        'On Sale',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 12,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          child: SizedBox(
+                            height: 80,
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        product['name'],
+                                        style: const TextStyle(
                                           fontWeight: FontWeight.bold,
+                                          fontSize: 16,
                                         ),
+                                        overflow: TextOverflow.ellipsis,
                                       ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      "Expires: ${formatDate(offer['expiration_date'])}",
-                                      style: const TextStyle(
-                                        fontSize: 11,
-                                        color: Colors.grey,
+                                      const SizedBox(height: 4),
+                                      offer != null
+                                          ? Row(
+                                              children: [
+                                                Text(
+                                                  "\$${product['price']}",
+                                                  style: const TextStyle(
+                                                    decoration: TextDecoration.lineThrough,
+                                                    color: Colors.grey,
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 8),
+                                                Text(
+                                                  "\$${offer['discount_price']}",
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Colors.green,
+                                                  ),
+                                                ),
+                                              ],
+                                            )
+                                          : Text("Price: \$${product['price']}"),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        "Stock: ${product['stock'] ?? 'N/A'}",
+                                        style: const TextStyle(fontSize: 13, color: Colors.black54),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
-                            ],
-                          ),
-                          subtitle: offer != null
-                              ? Row(
-                                  children: [
-                                    const Text("Price: "),
-                                    Text(
-                                      "\$${product['price']}",
-                                      style: const TextStyle(
-                                        decoration: TextDecoration.lineThrough,
-                                        color: Colors.grey,
-                                      ),
+                                if (offer != null)
+                                  Container(
+                                    margin: const EdgeInsets.symmetric(horizontal: 8),
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: Colors.redAccent,
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: const Text(
+                                            'On Sale',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          "Expires: ${formatDate(offer['expiration_date'])}",
+                                          style: const TextStyle(
+                                            fontSize: 11,
+                                            color: Colors.grey,
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      "\$${offer['discount_price']}",
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.green,
-                                      ),
-                                    ),
-                                  ],
-                                )
-                              : Text("Price: \$${product['price']}"),
-                          trailing: IconButton(
-                            icon: const Icon(Icons.add_shopping_cart),
-                            onPressed: () => addToCart(product),
+                                  ),
+                                IconButton(
+                                  icon: const Icon(Icons.add_shopping_cart),
+                                  color: (product['stock'] ?? 0) > 0 ? Colors.deepPurple : Colors.grey,
+                                  onPressed: (product['stock'] ?? 0) > 0 ? () => addToCart(product) : null,
+                                  tooltip: (product['stock'] ?? 0) > 0 ? 'Add to cart' : 'Out of stock',
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       );

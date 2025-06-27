@@ -13,14 +13,32 @@ function generateDeliveryCode(length = 8) {
 const placeOrder = async ({ buyer_id, distributor_id, product_id, quantity }) => {
   const delivery_code = generateDeliveryCode();
 
-  const result = await pool.query(
-    `INSERT INTO orders (buyer_id, distributor_id, product_id, quantity, delivery_code)
-     VALUES ($1, $2, $3, $4, $5)
-     RETURNING id, delivery_code`, // return only needed fields
-    [buyer_id, distributor_id, product_id, quantity, delivery_code]
-  );
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
 
-  return result.rows[0]; // { id, delivery_code }
+    // Insert order
+    const result = await client.query(
+      `INSERT INTO orders (buyer_id, distributor_id, product_id, quantity, delivery_code)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, delivery_code`,
+      [buyer_id, distributor_id, product_id, quantity, delivery_code]
+    );
+
+    // Reduce stock
+    await client.query(
+      `UPDATE products SET stock = stock - $1 WHERE id = $2 AND stock >= $1`,
+      [quantity, product_id]
+    );
+
+    await client.query('COMMIT');
+    return result.rows[0];
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
 };
 
 const getBuyerOrders = async (buyer_id) => {

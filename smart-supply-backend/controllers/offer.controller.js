@@ -16,6 +16,7 @@ const addOffer = async (req, res) => {
   }
 };
 
+// Updated: Join products to get product_name in all offers and my offers
 const listOffers = async (req, res) => {
   const { distributorId } = req.query;
 
@@ -42,8 +43,16 @@ const listOffers = async (req, res) => {
 
 const listMyOffers = async (req, res) => {
   try {
-    const offers = await getOffersByDistributor(req.user.id);
-    res.json(offers);
+    // Updated query to join products and include product_name for user's offers
+    const result = await pool.query(
+      `SELECT o.*, p.name AS product_name
+       FROM offers o
+       JOIN products p ON o.product_id = p.id
+       WHERE o.distributor_id = $1
+       ORDER BY o.expiration_date ASC`,
+      [req.user.id]
+    );
+    res.json(result.rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth.middleware');
-const crypto = require('crypto');
+const pool = require('../db');
 
 const {
   createOrder,
@@ -11,39 +11,22 @@ const {
   allOrders,
 } = require('../controllers/order.controller');
 
-// Order routes
-router.post('/', auth, createOrder);                         // Place order
-router.get('/my', auth, buyerOrders);                        // Supermarket's orders
-router.get('/incoming', auth, distributorOrders);            // Distributor's orders
-router.put('/:id/status', auth, changeStatus);               // Update order status
-router.get('/', auth, allOrders);                            // Admin/dev view
+// Place order (with stock update now handled in model)
+router.post('/', auth, createOrder);
 
+// Buyer orders (supermarket)
+router.get('/my', auth, buyerOrders);
 
-// Create a new order with delivery_code
-router.post('/', async (req, res) => {
-  const { product_id, distributor_id, quantity, buyer_id } = req.body;
+// Distributor orders
+router.get('/incoming', auth, distributorOrders);
 
-  if (!product_id || !distributor_id || !quantity || !buyer_id) {
-    return res.status(400).json({ error: 'Missing required fields' });
-  }
+// Update order status
+router.put('/:id/status', auth, changeStatus);
 
-  const delivery_code = crypto.randomBytes(4).toString('hex');
+// Admin view
+router.get('/', auth, allOrders);
 
-  try {
-    await pool.query(
-      `INSERT INTO orders (product_id, distributor_id, quantity, buyer_id, status, delivery_code)
-       VALUES ($1, $2, $3, $4, 'pending', $5)`,
-      [product_id, distributor_id, quantity, buyer_id, delivery_code]
-    );
-
-    res.status(201).json({ message: 'Order created', delivery_code });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Order creation failed' });
-  }
-});
-
-// routes/order.routes.js
+// Incoming orders + delivery name
 router.get('/incoming', auth, async (req, res) => {
   try {
     const distributorId = req.user.id;
@@ -65,5 +48,26 @@ router.get('/incoming', auth, async (req, res) => {
   }
 });
 
+// Inventory for supermarkets
+router.get('/inventory', auth, async (req, res) => {
+  const userId = req.user.id;
+  try {
+    const result = await pool.query(`
+      SELECT 
+        p.id AS product_id,
+        p.name AS product_name,
+        SUM(o.quantity) AS total_quantity
+      FROM orders o
+      JOIN products p ON o.product_id = p.id
+      WHERE o.buyer_id = $1 AND o.status = 'delivered'
+      GROUP BY p.id, p.name
+      ORDER BY p.name
+    `, [userId]);
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Error fetching inventory:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 module.exports = router;

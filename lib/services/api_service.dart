@@ -154,6 +154,27 @@ static Future<List<dynamic>> getProducts(String token, {int? distributorId}) asy
     );
     return res.statusCode == 200;
   }
+static Future<List<dynamic>> getSupermarketInventory(String token) async {
+  final res = await http.get(
+    Uri.parse("$baseUrl/orders/inventory"),
+    headers: {"Authorization": "Bearer $token"},
+  );
+  return res.statusCode == 200 ? jsonDecode(res.body) : [];
+}
+static Future<bool> updateStock({required String token,required int productId,required int quantitySold,}) async {
+  final res = await http.post(
+    Uri.parse('$baseUrl/products/$productId/update_stock'),
+    headers: {
+      'Authorization': 'Bearer $token',
+      'Content-Type': 'application/json',
+    },
+    body: jsonEncode({
+      'quantity_sold': quantitySold,
+    }),
+  );
+
+  return res.statusCode == 200;
+}
 
   // 🎁 OFFERS
   // Get offers

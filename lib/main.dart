@@ -19,13 +19,14 @@ import 'screens/distributor/dashboard_page.dart';
 import 'screens/distributor/manageproducts_page.dart';
 import 'screens/distributor/addproduct_page.dart';
 import 'screens/distributor/editproduct_page.dart';
-import 'screens/distributor/incomingorders_page.dart';
+import 'screens/distributor/incomingorders_page.dart';  // Note renamed import, ensure consistent
 import 'screens/distributor/manageoffers_page.dart';
 import 'screens/distributor/addoffer_page.dart';
 import 'screens/distributor/chat_page.dart';
 import 'screens/distributor/profile_page.dart';
 import 'screens/distributor/deliverymanagement_page.dart';
 import 'screens/distributor/AssignedOrdersDetails_page.dart';
+
 // Delivery
 import 'screens/delivery/dashboard_page.dart';
 import 'screens/delivery/assignedorders_page.dart';
@@ -38,6 +39,8 @@ import 'screens/chat_list_page.dart';
 import 'screens/addchat_page.dart';
 import 'screens/qrgenerator_page.dart';
 import 'screens/QRscan_page.dart';
+
+final RouteObserver<ModalRoute<void>> routeObserver = RouteObserver<ModalRoute<void>>();
 
 void main() {
   runApp(const SupplyChainApp());
@@ -56,6 +59,7 @@ class SupplyChainApp extends StatelessWidget {
         useMaterial3: true,
       ),
       initialRoute: '/',
+      navigatorObservers: [routeObserver],
       onGenerateRoute: (settings) {
         final args = settings.arguments;
 
@@ -71,7 +75,7 @@ class SupplyChainApp extends StatelessWidget {
             return MaterialPageRoute(builder: (_) => const SupermarketDashboard());
           case '/browseProducts':
             return MaterialPageRoute(builder: (_) => const BrowseProductsPage());
-         case '/cart':
+          case '/cart':
             return MaterialPageRoute(builder: (_) => const CartPage());
           case '/orderHistory':
             return MaterialPageRoute(builder: (_) => const OrdersPage());
@@ -94,31 +98,33 @@ class SupplyChainApp extends StatelessWidget {
               return MaterialPageRoute(builder: (_) => EditProductPage(product: args));
             }
             return _errorRoute('Missing product data for EditProductPage');
-          case '/supplierOrders':
+          case '/supplierOrders': // renamed to match import
             return MaterialPageRoute(builder: (_) => const SupplierOrdersPage());
           case '/manageOffers':
             return MaterialPageRoute(builder: (_) => const ManageOffersPage());
           case '/addOffer':
-            final args = settings.arguments as Map<String, dynamic>?;
-            if (args != null) {
+            if (args is Map<String, dynamic>) {
               return MaterialPageRoute(
                 builder: (_) => AddOfferPage(
-                  productId: args?['productId'],
-                  productName: args?['productName'],
+                  productId: args['productId'],
+                  productName: args['productName'],
                 ),
               );
             }
             return _errorRoute('Missing product data for AddOfferPage');
-
-          case '/distributorProfile':
+          case '/supplierProfile':
             return MaterialPageRoute(builder: (_) => const DistributorProfilePage());
           case '/deliveryManagement':
             return MaterialPageRoute(builder: (_) => const DeliveryManagementPage());
           case '/assignedOrdersDetails':
-            final deliveryId = settings.arguments as int;
-            return MaterialPageRoute(
-              builder: (_) => AssignedOrdersDetailsPage(deliveryId: deliveryId),
-            );         // 🚚 Delivery
+            if (args is int) {
+              return MaterialPageRoute(
+                builder: (_) => AssignedOrdersDetailsPage(deliveryId: args),
+              );
+            }
+            return _errorRoute('Missing deliveryId for AssignedOrdersDetailsPage');
+
+          // 🚚 Delivery
           case '/deliveryDashboard':
             return MaterialPageRoute(builder: (_) => const DeliveryDashboard());
           case '/assignedOrders':
@@ -158,7 +164,6 @@ class SupplyChainApp extends StatelessWidget {
             }
             return _errorRoute('Missing role for AddChatPage');
 
-
           // 📦 QR
           case '/qrGenerate':
             if (args is Map<String, dynamic> &&
@@ -178,7 +183,7 @@ class SupplyChainApp extends StatelessWidget {
           // ⚙️ Settings
           case '/settings':
             return MaterialPageRoute(builder: (_) => const SettingsPage());
-          
+
           default:
             return _errorRoute('Page not found: ${settings.name}');
         }

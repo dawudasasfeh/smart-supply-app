@@ -19,39 +19,43 @@ class _QRScanPageState extends State<QRScanPage> {
     setState(() => isProcessing = true);
 
     final prefs = await SharedPreferences.getInstance();
-    prefs.getInt('user_id'); // must be saved at login
+    // Assuming user_id saved at login (not used here directly but can be used if needed)
+    // final userId = prefs.getInt('user_id');
 
     try {
       final parts = code.split(':');
       final orderId = int.tryParse(parts[0]);
-      final deliveryCode = parts[1];
+      final deliveryCode = parts.length > 1 ? parts[1] : '';
 
       if (orderId == null || deliveryCode.isEmpty) {
         throw Exception("Invalid QR code format");
       }
 
       final success = await ApiService.verifyDelivery(orderId, deliveryCode);
-      if (success) {
-        setState(() => message = "✅ Delivery Verified!");
-      } else {
-        setState(() => message = "❌ Invalid delivery code");
-      }
+      setState(() {
+        message = success ? "✅ Delivery Verified!" : "❌ Invalid delivery code";
+      });
     } catch (e) {
       setState(() => message = "❌ Error: ${e.toString()}");
     }
 
     Future.delayed(const Duration(seconds: 2), () {
-      setState(() {
-        isProcessing = false;
-        message = '';
-      });
+      if (mounted) {
+        setState(() {
+          isProcessing = false;
+          message = '';
+        });
+      }
     });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Scan QR Code'), backgroundColor: Colors.deepPurple),
+      appBar: AppBar(
+        title: const Text('Scan QR Code'),
+        backgroundColor: Colors.deepPurple,
+      ),
       body: Column(
         children: [
           Expanded(
@@ -75,7 +79,7 @@ class _QRScanPageState extends State<QRScanPage> {
                   color: message.startsWith("✅") ? Colors.green : Colors.red,
                 ),
               ),
-            )
+            ),
         ],
       ),
     );

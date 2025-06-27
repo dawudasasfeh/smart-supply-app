@@ -9,12 +9,14 @@ const {
 const createOrder = async (req, res) => {
   try {
     const { product_id, distributor_id, quantity } = req.body;
+
     const order = await placeOrder({
       buyer_id: req.user.id,
       distributor_id,
       product_id,
       quantity,
     });
+
     res.status(201).json(order);
   } catch (err) {
     res.status(500).json({ message: err.message });

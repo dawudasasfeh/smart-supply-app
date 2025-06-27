@@ -54,7 +54,7 @@ class _ManageOffersPageState extends State<ManageOffersPage> {
                 final offer = offers[index];
                 return Card(
                   child: ListTile(
-                    title: Text(offer['product_name'] ?? 'Unnamed'),
+                    title: Text(offer['product_name'] ?? 'Unnamed'),  // product_name now comes from backend join
                     subtitle: Text(
                       "Price: \$${offer['discount_price']} | Expires: ${formatDate(offer['expiration_date'])}",
                     ),
@@ -68,10 +68,7 @@ class _ManageOffersPageState extends State<ManageOffersPage> {
             ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: Colors.deepPurple,
-        onPressed: () => Navigator.pushNamed(
-          context,
-          '/browseProducts'
-        ).then((_) => fetchMyOffers()),
+        onPressed: () => Navigator.pushNamed(context, '/browseProducts').then((_) => fetchMyOffers()),
         child: const Icon(Icons.add),
       ),
     );

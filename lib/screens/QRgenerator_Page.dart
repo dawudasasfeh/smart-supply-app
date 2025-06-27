@@ -16,7 +16,10 @@ class QRGeneratorPage extends StatelessWidget {
     final fullCode = "$orderId:$deliveryCode";
 
     return Scaffold(
-      appBar: AppBar(title: const Text("Your Delivery QR"), backgroundColor: Colors.deepPurple),
+      appBar: AppBar(
+        title: const Text("Your Delivery QR"),
+        backgroundColor: Colors.deepPurple,
+      ),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -30,7 +33,7 @@ class QRGeneratorPage extends StatelessWidget {
             Text(
               "Show this QR code to the delivery person.",
               style: Theme.of(context).textTheme.bodyMedium,
-            )
+            ),
           ],
         ),
       ),

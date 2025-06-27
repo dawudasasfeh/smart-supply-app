@@ -1,4 +1,3 @@
-// backend/controllers/product.controller.js
 const {
   createProduct,
   getAllProducts,

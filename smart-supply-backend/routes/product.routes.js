@@ -14,6 +14,7 @@ const authenticate = require('../middleware/auth.middleware');
 router.get('/', getProducts);                  // Get all or with offers or filtered
 router.get('/:id', getProduct);                // Get product by ID
 
+
 router.post('/', authenticate, addProduct);    // Add product
 router.put('/:id', authenticate, update);      // Update product
 router.delete('/:id', authenticate, remove);   // Delete product

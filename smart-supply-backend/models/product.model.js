@@ -1,14 +1,7 @@
-// backend/models/product.model.js
 const pool = require('../db');
 
 const createProduct = async (product) => {
-  const {
-    name,
-    price,
-    stock,
-    description,
-    distributor_id,
-  } = product;
+  const { name, price, stock, description, distributor_id } = product;
 
   const res = await pool.query(
     `INSERT INTO products (name, price, stock, description, distributor_id)
@@ -64,6 +57,20 @@ const getProductsByDistributor = async (distributorId) => {
   return res.rows;
 };
 
+const reduceStock = async (productId, quantity) => {
+  const res = await pool.query(
+    `UPDATE products
+     SET stock = stock - $1
+     WHERE id = $2 AND stock >= $1
+     RETURNING *`,
+    [quantity, productId]
+  );
+  if (res.rowCount === 0) {
+    throw new Error('Insufficient stock or product not found');
+  }
+  return res.rows[0];
+};
+
 module.exports = {
   createProduct,
   getAllProducts,
@@ -72,4 +79,5 @@ module.exports = {
   deleteProduct,
   getProductsWithOffers,
   getProductsByDistributor,
+  reduceStock,
 };

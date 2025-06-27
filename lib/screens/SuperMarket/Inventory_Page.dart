@@ -1,48 +1,70 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../services/api_service.dart';
 
-class InventoryPage extends StatelessWidget {
+class InventoryPage extends StatefulWidget {
   const InventoryPage({super.key});
 
-  final List<Map<String, dynamic>> mockInventory = const [
-    {'product': 'Milk', 'stock': 12},
-    {'product': 'Rice', 'stock': 3},
-    {'product': 'Bread', 'stock': 8},
-    {'product': 'Tomato Sauce', 'stock': 0},
-  ];
+  @override
+  State<InventoryPage> createState() => _InventoryPageState();
+}
+
+class _InventoryPageState extends State<InventoryPage> {
+  List<dynamic> inventory = [];
+  bool isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    fetchInventory();
+  }
+
+  Future<void> fetchInventory() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token') ?? '';
+    final data = await ApiService.getSupermarketInventory(token);
+    setState(() {
+      inventory = data;
+      isLoading = false;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey[100],
       appBar: AppBar(
-        title: const Text('Inventory'),
+        title: const Text("Delivered Inventory"),
         backgroundColor: Colors.deepPurple,
       ),
-      backgroundColor: Colors.grey[100],
-      body: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: mockInventory.length,
-        itemBuilder: (context, index) {
-          final item = mockInventory[index];
-          final isLowStock = item['stock'] <= 5;
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : inventory.isEmpty
+              ? const Center(child: Text("No delivered inventory yet."))
+              : ListView.builder(
+                  itemCount: inventory.length,
+                  padding: const EdgeInsets.all(16),
+                  itemBuilder: (context, index) {
+                    final item = inventory[index];
 
-          return Card(
-            color: isLowStock ? Colors.red[50] : Colors.white,
-            margin: const EdgeInsets.only(bottom: 12),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            child: ListTile(
-              leading: const Icon(Icons.inventory_2_outlined, color: Colors.deepPurple),
-              title: Text(item['product'], style: const TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: Text("In Stock: ${item['stock']}"),
-              trailing: isLowStock
-                  ? const Icon(Icons.warning_amber, color: Colors.red)
-                  : const Icon(Icons.check_circle, color: Colors.green),
-              onTap: () {
-                // Optional: Show restock history or forecast
-              },
-            ),
-          );
-        },
-      ),
+                    return Card(
+                      margin: const EdgeInsets.symmetric(vertical: 8),
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        leading: const Icon(Icons.inventory_2, color: Colors.deepPurple),
+                        title: Text(
+                          item['product_name'] ?? item['name'],
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Text("Stock: ${item['total_quantity']}"),
+                      ),
+                    );
+                  },
+                ),
     );
   }
 }

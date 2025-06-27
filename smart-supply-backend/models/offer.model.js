@@ -20,9 +20,14 @@ const getAllOffers = async () => {
   return result.rows;
 };
 
+// You can remove or keep this, but if keeping, update as below:
 const getOffersByDistributor = async (distributor_id) => {
   const result = await pool.query(
-    `SELECT * FROM offers WHERE distributor_id = $1`,
+    `SELECT o.*, p.name AS product_name
+     FROM offers o
+     JOIN products p ON o.product_id = p.id
+     WHERE o.distributor_id = $1
+     ORDER BY o.expiration_date ASC`,
     [distributor_id]
   );
   return result.rows;
