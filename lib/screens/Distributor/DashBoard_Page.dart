@@ -94,6 +94,7 @@ class DistributorDashboard extends StatelessWidget {
                 );
               },
             ),
+            ListTile(leading: const Icon(Icons.person), title: const Text("Profile"),  onTap: () => Navigator.pushNamed(context, '/supplierProfile')),
             ListTile(leading: const Icon(Icons.settings), title: const Text("Settings"), onTap: () => Navigator.pushNamed(context, '/settings')),
           ],
         ),

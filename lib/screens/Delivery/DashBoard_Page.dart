@@ -44,6 +44,7 @@ class DeliveryDashboard extends StatelessWidget {
                 Navigator.pushNamed(context, '/deliveredOrders');
               },
             ),
+            ListTile(leading: const Icon(Icons.person), title: const Text("Profile"),  onTap: () => Navigator.pushNamed(context, '/deliveryProfile')),
             ListTile(
               leading: const Icon(Icons.settings),
               title: const Text('Settings'),

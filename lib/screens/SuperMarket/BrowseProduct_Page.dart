@@ -69,6 +69,15 @@ class _BrowseProductsPageState extends State<BrowseProductsPage> {
     );
   }
 
+  String formatDate(String isoString) {
+    try {
+      final date = DateTime.parse(isoString);
+      return "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
+    } catch (_) {
+      return isoString;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -107,7 +116,7 @@ class _BrowseProductsPageState extends State<BrowseProductsPage> {
                 fetchData();
               },
             ),
-        ),
+          ),
           Expanded(
             child: products.isEmpty
                 ? const Center(child: Text("No products found"))
@@ -127,29 +136,43 @@ class _BrowseProductsPageState extends State<BrowseProductsPage> {
                             children: [
                               Expanded(child: Text(product['name'])),
                               if (offer != null)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.redAccent,
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: const Text(
-                                    'On Sale',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.redAccent,
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: const Text(
+                                        'On Sale',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
                                     ),
-                                  ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      "Expires: ${formatDate(offer['expiration_date'])}",
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                             ],
                           ),
                           subtitle: offer != null
                               ? Row(
                                   children: [
+                                    const Text("Price: "),
                                     Text(
                                       "\$${product['price']}",
                                       style: const TextStyle(

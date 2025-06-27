@@ -109,9 +109,9 @@ class SupplyChainApp extends StatelessWidget {
               );
             }
             return _errorRoute('Missing product data for AddOfferPage');
-          
-          case '/supplierProfile':
-            return MaterialPageRoute(builder: (_) => const SupplierProfilePage());
+
+          case '/distributorProfile':
+            return MaterialPageRoute(builder: (_) => const DistributorProfilePage());
           case '/deliveryManagement':
             return MaterialPageRoute(builder: (_) => const DeliveryManagementPage());
           case '/assignedOrdersDetails':
