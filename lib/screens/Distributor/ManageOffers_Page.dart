@@ -68,7 +68,7 @@ class _ManageOffersPageState extends State<ManageOffersPage> {
             ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: Colors.deepPurple,
-        onPressed: () => Navigator.pushNamed(context, '/browseProducts').then((_) => fetchMyOffers()),
+        onPressed: () => Navigator.pushNamed(context, '/manageProducts').then((_) => fetchMyOffers()),
         child: const Icon(Icons.add),
       ),
     );

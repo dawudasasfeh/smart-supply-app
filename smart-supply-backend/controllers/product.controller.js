@@ -68,10 +68,29 @@ const remove = async (req, res) => {
   }
 };
 
+
+// ✅ Add to stock from AI
+const restockProduct = async (req, res) => {
+  const { product_id, quantity } = req.body;
+  if (!product_id || !quantity || quantity <= 0) {
+    return res.status(400).json({ message: 'Invalid input' });
+  }
+  try {
+    await pool.query(
+      `UPDATE products SET stock = stock + $1 WHERE id = $2`,
+      [quantity, product_id]
+    );
+    res.status(200).json({ message: 'Product restocked' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 module.exports = {
   addProduct,
   getProducts,
   getProduct,
+  restockProduct, 
   update,
   remove,
 };

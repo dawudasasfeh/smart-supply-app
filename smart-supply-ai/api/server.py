@@ -1,45 +1,26 @@
 from flask import Flask, request, jsonify
+import pandas as pd
 import joblib
-import os
-import datetime
 
 app = Flask(__name__)
+model_dict = joblib.load('model/restock_model.pkl')  # your saved dict of models
 
 @app.route('/predict', methods=['POST'])
 def predict_restock():
     data = request.get_json()
-
     product_id = data.get('product_id')
-    days_ahead = data.get('days_ahead', 7)  # default 7 days from now
+    days_ahead = data.get('days_ahead')
 
-    if not product_id:
-        return jsonify({'error': 'Missing product_id'}), 400
+    if product_id is None or days_ahead is None:
+        return jsonify({'error': 'Missing product_id or days_ahead'}), 400
 
-    model_path = f'../model/restock_model_product_{product_id}.pkl'
-    if not os.path.exists(model_path):
-        return jsonify({'error': f'Model for product {product_id} not found'}), 404
+    model = model_dict.get(product_id)
+    if model is None:
+        return jsonify({'restock_quantity': 0})
 
-    model = joblib.load(model_path)
-
-    # Predict using days from the start of the dataset
-    today = datetime.datetime.today()
-    start_date = today - datetime.timedelta(days=days_ahead)
-    days_from_start = (today - start_date).days + days_ahead
-
-    prediction = model.predict([[days_from_start]])
-    predicted_qty = max(int(prediction[0]), 0)
-
-    return jsonify({
-        'product_id': product_id,
-        'recommended_restock': predicted_qty,
-        'days_ahead': days_ahead
-    })
-
-
-@app.route('/', methods=['GET'])
-def health_check():
-    return jsonify({'message': 'AI Server is running'})
-
+    features = pd.DataFrame([{'days_since': days_ahead}])
+    prediction = model.predict(features)[0]
+    return jsonify({'restock_quantity': int(round(prediction))})
 
 if __name__ == '__main__':
     app.run(debug=True, port=5001)

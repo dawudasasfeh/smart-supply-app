@@ -1,25 +1,31 @@
+# train_model.py
+from sqlalchemy import create_engine
 import pandas as pd
-import os
-import joblib
-from sklearn.linear_model import LinearRegression
-from sklearn.model_selection import train_test_split
+import xgboost as xgb
+import pickle
+from datetime import datetime
 
-# Load CSV
-df = pd.read_csv('data/sales_data.csv')
-df['date'] = pd.to_datetime(df['date'])
-df['days_from_start'] = (df['date'] - df['date'].min()).dt.days
+# Connect to PostgreSQL
+engine = create_engine("postgresql://postgres:dawud@localhost:5432/GP")
 
-# Group by product_id if needed
-for product_id in df['product_id'].unique():
-    product_data = df[df['product_id'] == product_id]
-    
-    X = product_data[['days_from_start']]
-    y = product_data['sales_quantity']
+# Load sales data
+df = pd.read_sql("SELECT * FROM product_sales", engine)
 
-    model = LinearRegression()
+# Preprocess: convert sale_date to days since start
+df['sale_date'] = pd.to_datetime(df['sale_date'])
+df['days_since'] = (df['sale_date'] - df['sale_date'].min()).dt.days
+
+# Train a model per product
+models = {}
+for product_id, group in df.groupby('product_id'):
+    X = group[['days_since']]
+    y = group['quantity']
+    model = xgb.XGBRegressor(objective='reg:squarederror', n_estimators=100)
     model.fit(X, y)
+    models[product_id] = model
 
-    # Save model per product
-    os.makedirs('model', exist_ok=True)
-    joblib.dump(model, f'model/restock_model_product_{product_id}.pkl')
-    print(f'Model saved for product {product_id}')
+# Save all models as a dictionary
+with open('model/restock_model.pkl', 'wb') as f:
+    pickle.dump(models, f)
+
+print("✅ All product models trained and saved.")

@@ -12,6 +12,7 @@ class InventoryPage extends StatefulWidget {
 class _InventoryPageState extends State<InventoryPage> {
   List<dynamic> inventory = [];
   bool isLoading = true;
+  String token = '';
 
   @override
   void initState() {
@@ -21,7 +22,7 @@ class _InventoryPageState extends State<InventoryPage> {
 
   Future<void> fetchInventory() async {
     final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('token') ?? '';
+    token = prefs.getString('token') ?? '';
     final data = await ApiService.getSupermarketInventory(token);
     setState(() {
       inventory = data;
@@ -29,6 +30,46 @@ class _InventoryPageState extends State<InventoryPage> {
     });
   }
 
+ void _predictAndRestock(int productId, String name) async {
+  print('Predicting restock for product $productId');
+  final quantity = await ApiService.predictRestock(productId: productId, daysAhead: 7);
+  print('Prediction result: $quantity');
+
+  if (quantity == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Failed to get restock prediction")),
+    );
+    return;
+  }
+
+  showDialog(
+    context: context,
+    builder: (_) => AlertDialog(
+      title: Text("AI Suggestion for '$name'"),
+      content: Text("Restock $quantity units?"),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+        ElevatedButton(
+          onPressed: () async {
+            final success = await ApiService.restockProduct(productId, quantity);
+            Navigator.pop(context);
+            if (success) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text("Product restocked successfully")),
+              );
+              fetchInventory(); // Or fetchProducts(), whatever refreshes the page
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text("Failed to restock product")),
+              );
+            }
+          },
+          child: const Text("Restock Now"),
+        ),
+      ],
+    ),
+  );
+}
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -57,10 +98,15 @@ class _InventoryPageState extends State<InventoryPage> {
                         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                         leading: const Icon(Icons.inventory_2, color: Colors.deepPurple),
                         title: Text(
-                          item['product_name'] ?? item['name'],
+                          item['product_name'] ?? item['name'] ?? 'Unknown Product',
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                         subtitle: Text("Stock: ${item['total_quantity']}"),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.insights, color: Colors.teal),
+                          tooltip: 'Predict Restock',
+                          onPressed: () => _predictAndRestock(item['product_id'] ?? item['id'], item['product_name'] ?? item['name'] ?? 'Product'),
+                        ),
                       ),
                     );
                   },

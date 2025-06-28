@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 
 class ApiService {
   static const String baseUrl = "http://10.0.2.2:5000/api"; // Emulator localhost
+  static const String flaskBaseUrl = 'http://10.0.2.2:5001';
 
   // 🔐 AUTH
   static Future<Map<String, dynamic>?> login(String email, String password) async {
@@ -441,5 +442,40 @@ static Future<List<Map<String, dynamic>>> getUsersByRole(String role) async {
 }
 
 
+  //AI
+  // ✅ Call Flask AI prediction
+static Future<int?> predictRestock({required int productId, required int daysAhead}) async {
+  try {
+    final url = Uri.parse('$flaskBaseUrl/predict');
+    final res = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'product_id': productId, 'days_ahead': daysAhead}),
+    );
 
+    if (res.statusCode == 200) {
+      final json = jsonDecode(res.body);
+      print('Prediction response: $json');
+      return json['restock_quantity'] as int?;
+    } else {
+      print('Prediction error: ${res.statusCode} ${res.body}');
+      return null;
+    }
+  } catch (e) {
+    print('Exception in predictRestock: $e');
+    return null;
+  }
+}
+
+
+  // ✅ Create internal restock order (simulate by adding stock or log it)
+  static Future<bool> restockProduct(int productId, int quantity) async {
+    final url = Uri.parse('$baseUrl/products/restock');
+    final res = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'product_id': productId, 'quantity': quantity}),
+    );
+    return res.statusCode == 200;
+  }
 }
