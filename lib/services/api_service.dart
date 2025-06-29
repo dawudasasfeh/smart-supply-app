@@ -137,30 +137,29 @@ static Future<List<dynamic>> getProducts(String token, {int? distributorId}) asy
 
 
   // 🛒 ORDERS
-  static Future<bool> placeOrder({
+   static Future<Map<String, dynamic>?> placeMultiOrder({
     required String token,
-    required int productId,
     required int distributorId,
-    required int quantity,
+    required List<Map<String, dynamic>> items,
   }) async {
     final res = await http.post(
-      Uri.parse("$baseUrl/orders"),
+      Uri.parse('$baseUrl/orders/multi'),
       headers: {
         "Authorization": "Bearer $token",
         "Content-Type": "application/json",
       },
       body: jsonEncode({
-        "product_id": productId,
         "distributor_id": distributorId,
-        "quantity": quantity,
+        "items": items,
       }),
     );
-    return res.statusCode == 201;
+
+    return res.statusCode == 201 ? jsonDecode(res.body) : null;
   }
 
   static Future<List<dynamic>> getBuyerOrders(String token) async {
     final res = await http.get(
-      Uri.parse("$baseUrl/orders/my"),
+      Uri.parse('$baseUrl/orders/my'),
       headers: {"Authorization": "Bearer $token"},
     );
     return res.statusCode == 200 ? jsonDecode(res.body) : [];
@@ -168,7 +167,7 @@ static Future<List<dynamic>> getProducts(String token, {int? distributorId}) asy
 
   static Future<List<dynamic>> getDistributorOrders(String token) async {
     final res = await http.get(
-      Uri.parse("$baseUrl/orders/incoming"),
+      Uri.parse('$baseUrl/orders/incoming'),
       headers: {"Authorization": "Bearer $token"},
     );
     return res.statusCode == 200 ? jsonDecode(res.body) : [];
@@ -176,7 +175,7 @@ static Future<List<dynamic>> getProducts(String token, {int? distributorId}) asy
 
   static Future<bool> updateOrderStatus(String token, int id, String status) async {
     final res = await http.put(
-      Uri.parse("$baseUrl/orders/$id/status"),
+      Uri.parse('$baseUrl/orders/$id/status'),
       headers: {
         "Authorization": "Bearer $token",
         "Content-Type": "application/json",
@@ -185,6 +184,8 @@ static Future<List<dynamic>> getProducts(String token, {int? distributorId}) asy
     );
     return res.statusCode == 200;
   }
+
+
 static Future<List<dynamic>> getSupermarketInventory(String token) async {
   final res = await http.get(
     Uri.parse("$baseUrl/orders/inventory"),
@@ -344,23 +345,20 @@ static Future<bool> updateStock({required String token,required int productId,re
     }
   }
   // 📦 Get orders for delivery man
-static Future<List<dynamic>> getAssignedOrders(int deliveryId) async {
-  final res = await http.get(Uri.parse('$baseUrl/delivery/orders/$deliveryId'));
-  return res.statusCode == 200 ? jsonDecode(res.body) : [];
-}
+  static Future<List<dynamic>> getAssignedOrders(int deliveryId) async {
+    final res = await http.get(Uri.parse('$baseUrl/delivery/orders/$deliveryId'));
+    return res.statusCode == 200 ? jsonDecode(res.body) : [];
+  }
 
-// ✅ Assign order to delivery man
-static Future<bool> assignOrderToDelivery(int orderId, int deliveryId) async {
-  final response = await http.post(
-    Uri.parse('$baseUrl/delivery/assign'),
-    headers: {"Content-Type": "application/json"},
-    body: jsonEncode({
-      "order_id": orderId,
-      "delivery_id": deliveryId,
-    }),
-  );
-  return response.statusCode == 201;
-}
+  static Future<bool> assignOrderToDelivery(int orderId, int deliveryId) async {
+    final res = await http.post(
+      Uri.parse('$baseUrl/delivery/assign'),
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode({"order_id": orderId, "delivery_id": deliveryId}),
+    );
+    return res.statusCode == 201;
+  }
+
 
 // 🔄 Update delivery status
 static Future<bool> updateDeliveryStatus({
@@ -392,28 +390,28 @@ static Future<bool> verifyDelivery(int orderId, String code) async {
   return res.statusCode == 200;
 }
 
-static Future<Map<String, dynamic>?> placeOrderWithQR({
-  required String token,
-  required int productId,
-  required int distributorId,
-  required int quantity,
-}) async {
-  final res = await http.post(
-    Uri.parse("$baseUrl/orders"),
-    headers: {
-      "Authorization": "Bearer $token",
-      "Content-Type": "application/json",
-    },
-    body: jsonEncode({
-      "product_id": productId,
-      "distributor_id": distributorId,
-      "quantity": quantity,
-    }),
-  );
+static Future<Map<String, dynamic>?> placeMultiOrderWithQR(String token, Map<String, dynamic> data) async {
+  try {
+    final url = Uri.parse('$baseUrl/orders/multi');
+    final res = await http.post(
+      url,
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode(data),
+    );
 
-  if (res.statusCode == 201) {
-    return jsonDecode(res.body); // should include { order_id, delivery_code }
-  } else {
+    if (res.statusCode == 201) {
+      final decoded = jsonDecode(res.body);
+      print('✅ Order placed successfully: $decoded');
+      return decoded;
+    } else {
+      print('❌ Order failed: ${res.statusCode} - ${res.body}');
+      return null;
+    }
+  } catch (e) {
+    print('🔥 Exception in placeMultiOrderWithQR: $e');
     return null;
   }
 }

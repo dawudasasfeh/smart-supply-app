@@ -1,5 +1,5 @@
 const {
-  placeOrder,
+  placeMultiProductOrder,
   getBuyerOrders,
   getDistributorOrders,
   updateStatus,
@@ -8,17 +8,15 @@ const {
 
 const createOrder = async (req, res) => {
   try {
-    const { product_id, distributor_id, quantity } = req.body;
-
-    const order = await placeOrder({
+    const { distributor_id, items } = req.body; // items = [ { product_id, quantity, price } ]
+    const order = await placeMultiProductOrder({
       buyer_id: req.user.id,
       distributor_id,
-      product_id,
-      quantity,
+      items,
     });
-
     res.status(201).json(order);
   } catch (err) {
+    console.error('Order error:', err);
     res.status(500).json({ message: err.message });
   }
 };

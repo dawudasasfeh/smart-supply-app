@@ -63,30 +63,40 @@ class _BrowseProductsPageState extends State<BrowseProductsPage> {
     await fetchData();
   }
 
-  void addToCart(Map<String, dynamic> product) {
-    final matchedOffer = offers.firstWhere(
-      (offer) => offer['product_id'] == product['id'],
-      orElse: () => null,
-    );
+void addToCart(Map<String, dynamic> product) {
+  final matchedOffer = offers.firstWhere(
+    (offer) => offer['product_id'] == product['id'],
+    orElse: () => null,
+  );
 
-    final price = matchedOffer != null ? matchedOffer['discount_price'] : product['price'];
+  final price = matchedOffer != null ? matchedOffer['discount_price'] : product['price'];
 
-    final cartItem = {
-      'id': product['id'],
-      'name': product['name'],
-      'price': price,
-      'quantity': 1,
-      'distributor_id': product['distributor_id'],
-      'stock': product['stock'] ?? 1,
-    };
+  // Ensure distributor_id is present
+  final distributorId = product['distributor_id'] ??
+      (product['distributor'] != null ? product['distributor']['id'] : null);
 
-    CartManager().addItem(cartItem);
-
+  if (distributorId == null) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("${product['name']} added to cart")),
+      const SnackBar(content: Text("❌ Distributor ID not found. Cannot add to cart.")),
     );
+    return;
   }
 
+  final cartItem = {
+    'id': product['id'],
+    'name': product['name'],
+    'price': price,
+    'quantity': 1,
+    'distributor_id': distributorId,
+    'stock': product['stock'] ?? 1,
+  };
+
+  CartManager().addItem(cartItem);
+
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content: Text("${product['name']} added to cart")),
+  );
+}
   String formatDate(String isoString) {
     try {
       final date = DateTime.parse(isoString);

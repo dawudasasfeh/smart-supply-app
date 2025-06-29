@@ -12,6 +12,8 @@ class CartManager extends ChangeNotifier {
 
   void addItem(Map<String, dynamic> item) {
     final existingIndex = _cartItems.indexWhere((e) => e['id'] == item['id']);
+    final price = item['discount_price'] ?? item['price'] ?? 0;
+
     if (existingIndex >= 0) {
       final currentQty = _cartItems[existingIndex]['quantity'] as int? ?? 1;
       final stock = _cartItems[existingIndex]['stock'] as int? ?? 1;
@@ -24,6 +26,8 @@ class CartManager extends ChangeNotifier {
         ...item,
         'quantity': 1,
         'stock': item['stock'] ?? 1,
+        'price': price,
+        'distributor_id': item['distributor_id'],
       });
       notifyListeners();
     }

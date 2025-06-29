@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../cartmanager_page.dart'; // Your cart manager
+import '../cartmanager_page.dart';
 import '../../services/api_service.dart';
 
 class CartPage extends StatefulWidget {
@@ -27,43 +27,64 @@ class _CartPageState extends State<CartPage> {
     });
   }
 
-  Future<void> placeOrders() async {
-    setState(() => isLoading = true);
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('token') ?? '';
-    final cart = CartManager().cartItems;
+Future<void> placeOrders() async {
+  setState(() => isLoading = true);
+  final prefs = await SharedPreferences.getInstance();
+  final token = prefs.getString('token') ?? '';
+  final cart = CartManager().cartItems;
 
-    int? lastOrderId;
-    String? lastDeliveryCode;
+  // Group by distributor_id
+  final Map<int, List<Map<String, dynamic>>> groupedByDistributor = {};
 
-    for (var item in cart) {
-      final res = await ApiService.placeOrderWithQR(
-        token: token,
-        productId: item['id'],
-        distributorId: item['distributor_id'],
-        quantity: item['quantity'],
-      );
-      if (res != null) {
-        lastOrderId = res['order_id'];
-        lastDeliveryCode = res['delivery_code'];
-      }
+  for (var item in cart) {
+    final distributorId = item['distributor_id'];
+    if (distributorId != null) {
+      groupedByDistributor.putIfAbsent(distributorId, () => []).add(item);
     }
-
-    CartManager().clearCart();
-    setState(() => isLoading = false);
-
-    if (!mounted || lastOrderId == null || lastDeliveryCode == null) return;
-
-    // Navigate to QRGeneratorPage
-    await Navigator.pushNamed(context, '/qrGenerate', arguments: {
-      'orderId': lastOrderId,
-      'deliveryCode': lastDeliveryCode,
-    });
-
-    // After returning from QR, pop with signal so browse page can refresh stock
-    Navigator.pop(context, 'order_placed');
   }
 
+  int? lastOrderId;
+  String? lastDeliveryCode;
+
+  for (var entry in groupedByDistributor.entries) {
+    final distributorId = entry.key;
+    final items = entry.value;
+
+    final orderPayload = {
+      'distributor_id': distributorId,
+      'items': items
+          .map((item) => {
+                'product_id': item['id'],
+                'quantity': item['quantity'],
+                'price': (item['price'] is String)
+                    ? double.tryParse(item['price']) ?? 0.0
+                    : item['price'] ?? 0.0,
+              })
+          .toList(),
+    };
+
+    final response = await ApiService.placeMultiOrderWithQR(token, orderPayload);
+    if (response != null) {
+      lastOrderId = response['order_id'];
+      lastDeliveryCode = response['delivery_code'];
+    }
+  }
+
+  CartManager().clearCart();
+  setState(() => isLoading = false);
+
+  if (!mounted || lastOrderId == null || lastDeliveryCode == null) return;
+
+  await Navigator.pushNamed(context, '/qrGenerate', arguments: {
+    'orderId': lastOrderId,
+    'deliveryCode': lastDeliveryCode,
+  });
+
+  Navigator.pop(context, 'order_placed');
+}
+
+  
+  
   void incrementQuantity(int index) {
     final cart = CartManager().cartItems;
     final item = cart[index];
@@ -170,7 +191,10 @@ class _CartPageState extends State<CartPage> {
                               ),
                             ],
                           ),
-                          trailing: Text("\$${item['price'] ?? item['discount_price']}"),
+                          trailing: Text(
+                            "\$${item['price'] ?? item['discount_price']}",
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
                         ),
                       );
                     },

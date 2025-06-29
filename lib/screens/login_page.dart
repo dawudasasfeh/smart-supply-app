@@ -31,7 +31,7 @@ class _LoginPageState extends State<LoginPage> {
       await prefs.setString('token', response['token']);
       await prefs.setString('role', response['user']['role']);
       await prefs.setInt('user_id', response['user']['id']);
-      
+      await prefs.setString('username', response['user']['name']);
       
       final role = response['user']['role'];
       if (role == 'Supermarket') {
