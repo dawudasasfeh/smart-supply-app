@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 // Auth
 import 'screens/EditProfile_page.dart';
 import 'screens/login_page.dart';
+import 'screens/payment_Page.dart';
 import 'screens/signup_page.dart';
 
 // Supermarket
@@ -182,7 +183,8 @@ class SupplyChainApp extends StatelessWidget {
             return _errorRoute('Missing QR generation data');
           case '/qrScan':
             return MaterialPageRoute(builder: (_) => const QRScanPage());
-
+          case '/paymentSettings':
+            return MaterialPageRoute(builder: (_) => const PaymentSettingsPage());
           // ⚙️ Settings
           case '/settings':
             return MaterialPageRoute(builder: (_) => const SettingsPage());

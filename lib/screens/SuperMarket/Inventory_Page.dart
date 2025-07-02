@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/api_service.dart';
+import 'package:intl/intl.dart'; // For date formatting
 
 class InventoryPage extends StatefulWidget {
   const InventoryPage({super.key});
@@ -13,6 +14,7 @@ class _InventoryPageState extends State<InventoryPage> {
   List<dynamic> inventory = [];
   bool isLoading = true;
   String token = '';
+  bool isPredicting = false;
 
   @override
   void initState() {
@@ -30,46 +32,84 @@ class _InventoryPageState extends State<InventoryPage> {
     });
   }
 
- void _predictAndRestock(int productId, String name) async {
-  print('Predicting restock for product $productId');
-  final quantity = await ApiService.predictRestock(productId: productId, daysAhead: 7);
-  print('Prediction result: $quantity');
+  Future<void> _predictAndRestock(dynamic item) async {
+    setState(() {
+      isPredicting = true;
+    });
 
-  if (quantity == null) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Failed to get restock prediction")),
-    );
-    return;
+    try {
+      // Extract all required fields from the item
+      final productId = item['product_id'] ?? item['id'];
+      final distributorId = item['distributor_id'] ?? 0; // replace 0 with valid id if possible
+      final stockLevel = (item['total_quantity'] ?? 0).toDouble();
+
+      // For previous orders, active offers, date, you need actual data - example defaults:
+      final previousOrders = item['previous_orders'] ?? 0;
+      final activeOffers = item['active_offers'] ?? 0;
+      final date = item['date'] ?? DateFormat('yyyy-MM-dd').format(DateTime.now());
+
+      print('Calling predictRestock with: productId=$productId, distributorId=$distributorId, stockLevel=$stockLevel, previousOrders=$previousOrders, activeOffers=$activeOffers, date=$date');
+
+      final prediction = await ApiService.predictRestock(
+        productId: productId,
+        distributorId: distributorId,
+        stockLevel: stockLevel,
+        previousOrders: previousOrders,
+        activeOffers: activeOffers,
+        date: date,
+      );
+
+      setState(() {
+        isPredicting = false;
+      });
+
+      if (prediction == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Failed to get restock prediction")),
+        );
+        return;
+      }
+
+      final predictedDemand = (prediction['predicted_demand'] ?? 0).toDouble();
+
+      showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: Text("AI Suggestion for '${item['product_name'] ?? item['name'] ?? 'Product'}'"),
+          content: Text("Predicted demand is $predictedDemand units.\nDo you want to restock this amount?"),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(context);
+                final success = await ApiService.restockProduct(productId, predictedDemand.toInt());
+                if (success) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("Product restocked successfully")),
+                  );
+                  fetchInventory();
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("Failed to restock product")),
+                  );
+                }
+              },
+              child: const Text("Restock Now"),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      setState(() {
+        isPredicting = false;
+      });
+      print('Error during restock prediction: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error: $e")),
+      );
+    }
   }
 
-  showDialog(
-    context: context,
-    builder: (_) => AlertDialog(
-      title: Text("AI Suggestion for '$name'"),
-      content: Text("Restock $quantity units?"),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
-        ElevatedButton(
-          onPressed: () async {
-            final success = await ApiService.restockProduct(productId, quantity);
-            Navigator.pop(context);
-            if (success) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("Product restocked successfully")),
-              );
-              fetchInventory(); // Or fetchProducts(), whatever refreshes the page
-            } else {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("Failed to restock product")),
-              );
-            }
-          },
-          child: const Text("Restock Now"),
-        ),
-      ],
-    ),
-  );
-}
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -102,11 +142,17 @@ class _InventoryPageState extends State<InventoryPage> {
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                         subtitle: Text("Stock: ${item['total_quantity']}"),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.insights, color: Colors.teal),
-                          tooltip: 'Predict Restock',
-                          onPressed: () => _predictAndRestock(item['product_id'] ?? item['id'], item['product_name'] ?? item['name'] ?? 'Product'),
-                        ),
+                        trailing: isPredicting
+                            ? const SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : IconButton(
+                                icon: const Icon(Icons.insights, color: Colors.teal),
+                                tooltip: 'Predict Restock',
+                                onPressed: () => _predictAndRestock(item),
+                              ),
                       ),
                     );
                   },

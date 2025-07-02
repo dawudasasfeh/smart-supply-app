@@ -440,21 +440,38 @@ static Future<List<Map<String, dynamic>>> getUsersByRole(String role) async {
 }
 
 
-  //AI
-  // ✅ Call Flask AI prediction
-static Future<int?> predictRestock({required int productId, required int daysAhead}) async {
+  // 🤖 AI INTEGRATION
+
+  /// Call Flask AI to predict restock quantity with all necessary features
+static Future<Map<String, dynamic>?> predictRestock({
+  required int productId,
+  required int distributorId,
+  required double stockLevel,
+  required int previousOrders,
+  required int activeOffers,
+  required String date,
+}) async {
   try {
     final url = Uri.parse('$flaskBaseUrl/predict');
-    final res = await http.post(
-      url,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'product_id': productId, 'days_ahead': daysAhead}),
-    );
+    final res = await http
+        .post(
+          url,
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'product_id': productId,
+            'distributor_id': distributorId,
+            'stock_level': stockLevel,
+            'previous_orders': previousOrders,
+            'active_offers': activeOffers,
+            'date': date,
+          }),
+        )
+        .timeout(const Duration(seconds: 10));  // timeout after 10 seconds
 
     if (res.statusCode == 200) {
       final json = jsonDecode(res.body);
       print('Prediction response: $json');
-      return json['restock_quantity'] as int?;
+      return json;
     } else {
       print('Prediction error: ${res.statusCode} ${res.body}');
       return null;
@@ -466,7 +483,7 @@ static Future<int?> predictRestock({required int productId, required int daysAhe
 }
 
 
-  // ✅ Create internal restock order (simulate by adding stock or log it)
+  /// Simulate restock product by adding quantity (or logging)
   static Future<bool> restockProduct(int productId, int quantity) async {
     final url = Uri.parse('$baseUrl/products/restock');
     final res = await http.post(
