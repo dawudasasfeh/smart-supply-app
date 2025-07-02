@@ -80,16 +80,26 @@ const getDistributorOrders = async (distributor_id) => {
 };
 
 const updateStatus = async (id, status) => {
-  const deliveredAt = status.toLowerCase() === 'delivered' ? new Date() : null;
+  let result;
 
-  const result = await pool.query(
-    `UPDATE orders 
-     SET status = $1,
-         delivered_at = CASE WHEN $1 = 'delivered' THEN NOW() ELSE delivered_at END
-     WHERE id = $2
-     RETURNING *`,
-    [status, id]
-  );
+  if (status.toLowerCase() === 'delivered') {
+    result = await pool.query(
+      `UPDATE orders 
+       SET status = $1, delivered_at = NOW()
+       WHERE id = $2
+       RETURNING *`,
+      [status, id]
+    );
+  } else {
+    result = await pool.query(
+      `UPDATE orders 
+       SET status = $1
+       WHERE id = $2
+       RETURNING *`,
+      [status, id]
+    );
+  }
+
   return result.rows[0];
 };
 
