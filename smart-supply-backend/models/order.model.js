@@ -28,14 +28,12 @@ const placeMultiProductOrder = async ({ buyer_id, distributor_id, items }) => {
     for (const item of items) {
       const { product_id, quantity, price } = item;
 
-      // Insert item
       await client.query(
         `INSERT INTO order_items (order_id, product_id, quantity, price)
          VALUES ($1, $2, $3, $4)`,
         [order_id, product_id, quantity, price]
       );
 
-      // Update stock
       await client.query(
         `UPDATE products SET stock = stock - $1
          WHERE id = $2 AND stock >= $1`,
@@ -47,6 +45,7 @@ const placeMultiProductOrder = async ({ buyer_id, distributor_id, items }) => {
     return result.rows[0];
   } catch (err) {
     await client.query('ROLLBACK');
+      console.error('Order error:', err);
     throw err;
   } finally {
     client.release();
@@ -55,7 +54,7 @@ const placeMultiProductOrder = async ({ buyer_id, distributor_id, items }) => {
 
 const getBuyerOrders = async (buyer_id) => {
   const result = await pool.query(
-    `SELECT o.*, json_agg(oi.*) AS items
+    `SELECT o.*, json_agg(row_to_json(oi)) AS items
      FROM orders o
      JOIN order_items oi ON o.id = oi.order_id
      WHERE o.buyer_id = $1
@@ -68,7 +67,7 @@ const getBuyerOrders = async (buyer_id) => {
 
 const getDistributorOrders = async (distributor_id) => {
   const result = await pool.query(
-    `SELECT o.*, json_agg(oi.*) AS items
+    `SELECT o.*, json_agg(row_to_json(oi)) AS items
      FROM orders o
      JOIN order_items oi ON o.id = oi.order_id
      WHERE o.distributor_id = $1
@@ -105,7 +104,7 @@ const updateStatus = async (id, status) => {
 
 const getAllOrders = async () => {
   const result = await pool.query(
-    `SELECT o.*, json_agg(oi.*) AS items
+    `SELECT o.*, json_agg(row_to_json(oi)) AS items
      FROM orders o
      JOIN order_items oi ON o.id = oi.order_id
      GROUP BY o.id
@@ -113,6 +112,7 @@ const getAllOrders = async () => {
   );
   return result.rows;
 };
+
 
 module.exports = {
   placeMultiProductOrder,

@@ -32,7 +32,7 @@ Future<void> placeOrders() async {
   final prefs = await SharedPreferences.getInstance();
   final token = prefs.getString('token') ?? '';
   final cart = CartManager().cartItems;
-
+final buyerId = prefs.getInt('user_id'); // or whatever key you use
   // Group by distributor_id
   final Map<int, List<Map<String, dynamic>>> groupedByDistributor = {};
 
@@ -50,7 +50,8 @@ Future<void> placeOrders() async {
     final distributorId = entry.key;
     final items = entry.value;
 
-    final orderPayload = {
+     final orderPayload = {
+      'buyer_id': buyerId, // <-- Add this line!
       'distributor_id': distributorId,
       'items': items
           .map((item) => {

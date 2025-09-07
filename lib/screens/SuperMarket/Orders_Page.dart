@@ -18,12 +18,14 @@ class _OrdersPageState extends State<OrdersPage> {
     fetchOrders();
   }
 
-  Future<void> fetchOrders() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('token') ?? '';
-    final result = await ApiService.getBuyerOrders(token);
-    setState(() => orders = result);
-  }
+ Future<void> fetchOrders() async {
+  final prefs = await SharedPreferences.getInstance();
+  final token = prefs.getString('token') ?? '';
+  final buyerId = prefs.getInt('user_id'); // or your user ID key
+  final result = await ApiService.getBuyerOrders(token, buyerId!);
+  print('Fetched orders: $result');
+  setState(() => orders = result);
+}
 
   @override
   Widget build(BuildContext context) {

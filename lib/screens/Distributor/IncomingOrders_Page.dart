@@ -22,12 +22,14 @@ class _SupplierOrdersPageState extends State<SupplierOrdersPage> {
     fetchDeliveryMen();
   }
 
-  Future<void> fetchOrders() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('token') ?? '';
-    final result = await ApiService.getDistributorOrders(token);
-    setState(() => orders = result);
-  }
+ Future<void> fetchOrders() async {
+  final prefs = await SharedPreferences.getInstance();
+  final token = prefs.getString('token') ?? '';
+  final distributorId = prefs.getInt('user_id'); // or your distributor ID key
+  final result = await ApiService.getDistributorOrders(token, distributorId!);
+  print('Fetched orders: $result');
+  setState(() => orders = result);
+}
 
   Future<void> fetchDeliveryMen() async {
   try {

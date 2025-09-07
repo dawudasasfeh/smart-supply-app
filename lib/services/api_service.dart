@@ -137,41 +137,49 @@ static Future<List<dynamic>> getProducts(String token, {int? distributorId}) asy
 
 
   // 🛒 ORDERS
-   static Future<Map<String, dynamic>?> placeMultiOrder({
-    required String token,
-    required int distributorId,
-    required List<Map<String, dynamic>> items,
-  }) async {
-    final res = await http.post(
-      Uri.parse('$baseUrl/orders/multi'),
-      headers: {
-        "Authorization": "Bearer $token",
-        "Content-Type": "application/json",
-      },
-      body: jsonEncode({
-        "distributor_id": distributorId,
-        "items": items,
-      }),
-    );
+static Future<Map<String, dynamic>?> placeMultiOrder({
+  required String token,
+  required int buyerId, // <-- Add this parameter
+  required int distributorId,
+  required List<Map<String, dynamic>> items,
+}) async {
+  final res = await http.post(
+    Uri.parse('$baseUrl/orders/multi'),
+    headers: {
+      "Authorization": "Bearer $token",
+      "Content-Type": "application/json",
+    },
+    body: jsonEncode({
+      "buyer_id": buyerId, // <-- Add this field
+      "distributor_id": distributorId,
+      "items": items,
+    }),
+  );
 
-    return res.statusCode == 201 ? jsonDecode(res.body) : null;
-  }
+  return res.statusCode == 201 ? jsonDecode(res.body) : null;
+}
 
-  static Future<List<dynamic>> getBuyerOrders(String token) async {
-    final res = await http.get(
-      Uri.parse('$baseUrl/orders/my'),
-      headers: {"Authorization": "Bearer $token"},
-    );
-    return res.statusCode == 200 ? jsonDecode(res.body) : [];
-  }
+static Future<List<dynamic>> getBuyerOrders(String token, int buyerId) async {
+  final res = await http.get(
+    Uri.parse('$baseUrl/orders/buyer/$buyerId'),
+    headers: {
+      "Authorization": "Bearer $token",
+      "Content-Type": "application/json",
+    },
+  );
+  return res.statusCode == 200 ? jsonDecode(res.body) : [];
+}
 
-  static Future<List<dynamic>> getDistributorOrders(String token) async {
-    final res = await http.get(
-      Uri.parse('$baseUrl/orders/incoming'),
-      headers: {"Authorization": "Bearer $token"},
-    );
-    return res.statusCode == 200 ? jsonDecode(res.body) : [];
-  }
+static Future<List<dynamic>> getDistributorOrders(String token, int distributorId) async {
+  final res = await http.get(
+    Uri.parse('$baseUrl/orders/distributor/$distributorId'),
+    headers: {
+      "Authorization": "Bearer $token",
+      "Content-Type": "application/json",
+    },
+  );
+  return res.statusCode == 200 ? jsonDecode(res.body) : [];
+}
 
   static Future<bool> updateOrderStatus(String token, int id, String status) async {
     final res = await http.put(
