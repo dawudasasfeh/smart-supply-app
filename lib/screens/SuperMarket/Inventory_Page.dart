@@ -86,18 +86,18 @@ void _predictAndRestock(dynamic item) async {
       return;
     }
 
-    final predictedQuantity = prediction['predicted_demand'] ?? 0;
+    final suggestedQuantity = prediction['suggested_quantity'] ?? 0;
 
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
         title: Text("AI Suggestion for '$productName'"),
-        content: Text("Restock $predictedQuantity units?"),
+        content: Text("Restock $suggestedQuantity units?"),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
           ElevatedButton(
             onPressed: () async {
-              final success = await ApiService.restockProduct(productId, predictedQuantity);
+              final success = await ApiService.restockProduct(token, productId, suggestedQuantity);
               Navigator.pop(context);
               if (success) {
                 ScaffoldMessenger.of(context).showSnackBar(

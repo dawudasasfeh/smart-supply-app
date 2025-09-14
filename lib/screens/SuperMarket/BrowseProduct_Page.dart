@@ -114,6 +114,12 @@ void addToCart(Map<String, dynamic> product) {
         backgroundColor: Colors.deepPurple,
         actions: [
           IconButton(
+            icon: const Icon(Icons.local_offer),
+            onPressed: () {
+              Navigator.pushNamed(context, '/offers');
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.shopping_cart),
             onPressed: () async {
               final result = await Navigator.pushNamed(context, '/cart');

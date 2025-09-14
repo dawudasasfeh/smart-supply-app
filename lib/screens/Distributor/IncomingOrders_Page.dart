@@ -68,7 +68,7 @@ class _SupplierOrdersPageState extends State<SupplierOrdersPage> {
     return Scaffold(
       appBar: AppBar(title: const Text("Incoming Orders"), backgroundColor: Colors.deepPurple),
       body: orders.isEmpty
-          ? const Center(child: Text("No incoming orders"))
+          ? const Center(child: Text("No orders available"))
           : ListView.builder(
               itemCount: orders.length,
               itemBuilder: (context, index) {

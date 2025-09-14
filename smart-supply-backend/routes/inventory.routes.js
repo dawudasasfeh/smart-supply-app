@@ -6,4 +6,7 @@ const authMiddleware = require('../middleware/auth.middleware');
 router.get('/low-stock', authMiddleware, inventoryController.getLowStock);
 router.post('/restock', authMiddleware, inventoryController.restock);
 
+// Get supermarket inventory
+router.get('/', authMiddleware, inventoryController.getSupermarketInventory);
+
 module.exports = router;

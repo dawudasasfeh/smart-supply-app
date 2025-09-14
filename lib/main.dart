@@ -1,4 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+// Services
+import 'services/socket_service.dart';
+
+// Theme
+import 'theme/app_theme.dart';
+import 'theme/theme_provider.dart';
 
 // Auth
 import 'screens/EditProfile_page.dart';
@@ -7,12 +15,12 @@ import 'screens/payment_Page.dart';
 import 'screens/signup_page.dart';
 
 // Supermarket
-import 'screens/supermarket/dashboard_page.dart';
 import 'screens/supermarket/browseproduct_page.dart';
 import 'screens/supermarket/cart_page.dart';
 import 'screens/supermarket/orders_page.dart';
 import 'screens/supermarket/inventory_page.dart';
 import 'screens/supermarket/offers_page.dart';
+import 'screens/supermarket/supermarket_main.dart';
 import 'screens/supermarket/chat_page.dart';
 import 'screens/supermarket/profile_page.dart';
 
@@ -37,32 +45,78 @@ import 'screens/delivery/profile_page.dart';
 
 // Common
 import 'screens/settings_page.dart';
-import 'screens/chat_list_page.dart';
-import 'screens/addchat_page.dart';
-import 'screens/qrgenerator_page.dart';
-import 'screens/QRscan_page.dart';
+import 'screens/enhanced_settings_page.dart';
+import 'screens/chat/chat_list_page.dart';
+import 'screens/chat/add_chat_page.dart';
+
+// QR Code Authentication
+import 'screens/qr_code/qr_generator_page.dart';
+import 'screens/qr_code/qr_scanner_page.dart';
+import 'screens/analytics_dashboard.dart';
+import 'screens/rating_system_page.dart';
 
 final RouteObserver<ModalRoute<void>> routeObserver = RouteObserver<ModalRoute<void>>();
 
 void main() {
-  runApp(const SupplyChainApp());
+  runApp(
+    ChangeNotifierProvider(
+      create: (context) => ThemeProvider(),
+      child: const SupplyChainApp(),
+    ),
+  );
 }
 
-class SupplyChainApp extends StatelessWidget {
+class SupplyChainApp extends StatefulWidget {
   const SupplyChainApp({super.key});
 
   @override
+  State<SupplyChainApp> createState() => _SupplyChainAppState();
+}
+
+class _SupplyChainAppState extends State<SupplyChainApp> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // Initialize Socket.IO connection
+    SocketService.instance.connect();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    SocketService.instance.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    switch (state) {
+      case AppLifecycleState.resumed:
+        SocketService.instance.connect();
+        break;
+      case AppLifecycleState.paused:
+      case AppLifecycleState.detached:
+        SocketService.instance.disconnect();
+        break;
+      default:
+        break;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Smart Supply Chain',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true,
-      ),
-      initialRoute: '/',
-      navigatorObservers: [routeObserver],
-      onGenerateRoute: (settings) {
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        return MaterialApp(
+          title: 'Smart Supply Chain',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.lightTheme,
+          darkTheme: AppTheme.darkTheme,
+          themeMode: themeProvider.themeMode,
+          initialRoute: '/',
+          navigatorObservers: [routeObserver],
+          onGenerateRoute: (settings) {
         final args = settings.arguments;
 
         switch (settings.name) {
@@ -74,7 +128,7 @@ class SupplyChainApp extends StatelessWidget {
 
           // 🏪 Supermarket
           case '/supermarketDashboard':
-            return MaterialPageRoute(builder: (_) => const SupermarketDashboard());
+            return MaterialPageRoute(builder: (_) => const SuperMarketMain());
           case '/browseProducts':
             return MaterialPageRoute(builder: (_) => const BrowseProductsPage());
           case '/cart':
@@ -138,21 +192,7 @@ class SupplyChainApp extends StatelessWidget {
           case '/editProfile':
             return MaterialPageRoute(builder: (_) => const EditProfilePage(role: ''));
 
-          // 💬 Chat
-          case '/chat':
-            if (args is Map<String, dynamic> && args.containsKey('distributorId')) {
-              return MaterialPageRoute(
-                builder: (_) => ChatPage(distributorId: args['distributorId']),
-              );
-            }
-            return _errorRoute('Missing distributorId for ChatPage');
-          case '/supplierChat':
-            if (args is Map<String, dynamic> && args.containsKey('supermarketId')) {
-              return MaterialPageRoute(
-                builder: (_) => SupplierChatPage(supermarketId: args['supermarketId']),
-              );
-            }
-            return _errorRoute('Missing supermarketId for SupplierChatPage');
+          // 💬 Chat (New Socket.IO System)
           case '/chatList':
             if (args is Map<String, dynamic> && args.containsKey('role')) {
               return MaterialPageRoute(
@@ -167,31 +207,58 @@ class SupplyChainApp extends StatelessWidget {
               );
             }
             return _errorRoute('Missing role for AddChatPage');
-
-          // 📦 QR
-          case '/qrGenerate':
-            if (args is Map<String, dynamic> &&
-                args.containsKey('orderId') &&
-                args.containsKey('deliveryCode')) {
+          
+          // Legacy chat routes (kept for backward compatibility)
+          case '/chat':
+            if (args is Map<String, dynamic> && args.containsKey('distributorId')) {
               return MaterialPageRoute(
-                builder: (_) => QRGeneratorPage(
-                  orderId: args['orderId'],
-                  deliveryCode: args['deliveryCode'],
+                builder: (_) => ChatPage(distributorId: args['distributorId']),
+              );
+            }
+            return _errorRoute('Missing distributorId for ChatPage');
+          case '/supplierChat':
+            if (args is Map<String, dynamic> && args.containsKey('supermarketId')) {
+              return MaterialPageRoute(
+                builder: (_) => SupplierChatPage(supermarketId: args['supermarketId']),
+              );
+            }
+            return _errorRoute('Missing supermarketId for SupplierChatPage');
+
+          // 📦 QR Code Authentication
+          case '/qrGenerator':
+            return MaterialPageRoute(builder: (_) => const QRGeneratorPage());
+          case '/qrScanner':
+            return MaterialPageRoute(builder: (_) => const QRScannerPage());
+          case '/paymentSettings':
+            return MaterialPageRoute(builder: (_) => const PaymentSettingsPage());
+          // 📊 Analytics
+          case '/analytics':
+            return MaterialPageRoute(builder: (_) => const AnalyticsDashboard());
+          
+          // ⭐ Rating System
+          case '/rating':
+            if (args is Map<String, dynamic>) {
+              return MaterialPageRoute(
+                builder: (_) => RatingSystemPage(
+                  userRole: args['userRole'] ?? 'supermarket',
                 ),
               );
             }
-            return _errorRoute('Missing QR generation data');
-          case '/qrScan':
-            return MaterialPageRoute(builder: (_) => const QRScanPage());
-          case '/paymentSettings':
-            return MaterialPageRoute(builder: (_) => const PaymentSettingsPage());
+            return MaterialPageRoute(
+              builder: (_) => const RatingSystemPage(userRole: 'supermarket'),
+            );
+          
           // ⚙️ Settings
           case '/settings':
+            return MaterialPageRoute(builder: (_) => const EnhancedSettingsPage());
+          case '/settingsOld':
             return MaterialPageRoute(builder: (_) => const SettingsPage());
 
           default:
             return _errorRoute('Page not found: ${settings.name}');
         }
+      },
+        );
       },
     );
   }

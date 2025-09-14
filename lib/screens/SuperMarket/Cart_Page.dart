@@ -43,8 +43,6 @@ final buyerId = prefs.getInt('user_id'); // or whatever key you use
     }
   }
 
-  int? lastOrderId;
-  String? lastDeliveryCode;
 
   for (var entry in groupedByDistributor.entries) {
     final distributorId = entry.key;
@@ -64,22 +62,13 @@ final buyerId = prefs.getInt('user_id'); // or whatever key you use
           .toList(),
     };
 
-    final response = await ApiService.placeMultiOrderWithQR(token, orderPayload);
-    if (response != null) {
-      lastOrderId = response['order_id'];
-      lastDeliveryCode = response['delivery_code'];
-    }
+    await ApiService.placeMultiOrderWithQR(token, orderPayload);
   }
 
   CartManager().clearCart();
   setState(() => isLoading = false);
 
-  if (!mounted || lastOrderId == null || lastDeliveryCode == null) return;
-
-  await Navigator.pushNamed(context, '/qrGenerate', arguments: {
-    'orderId': lastOrderId,
-    'deliveryCode': lastDeliveryCode,
-  });
+  if (!mounted) return;
 
   Navigator.pop(context, 'order_placed');
 }
