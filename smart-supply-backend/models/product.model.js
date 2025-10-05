@@ -1,12 +1,12 @@
 const pool = require('../db');
 
 const createProduct = async (product) => {
-  const { name, price, stock, description, distributor_id } = product;
+  const { name, price, stock, description, distributor_id, category, brand, sku, image_url } = product;
 
   const res = await pool.query(
-    `INSERT INTO products (name, price, stock, description, distributor_id)
-     VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-    [name, price, stock, description, distributor_id]
+    `INSERT INTO products (name, price, stock, description, distributor_id, category, brand, sku, image_url)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+    [name, price, stock, description, distributor_id, category || '', brand || '', sku || '', image_url]
   );
   return res.rows[0];
 };
@@ -22,15 +22,72 @@ const getProductById = async (id) => {
 };
 
 const updateProduct = async (id, data) => {
-  const { name, price, stock, description } = data;
-  const res = await pool.query(
-    `UPDATE products
-     SET name = $1, price = $2, stock = $3, description = $4
-     WHERE id = $5
-     RETURNING *`,
-    [name, price, stock, description, id]
-  );
-  return res.rows[0];
+  const { name, price, stock, description, category, brand, sku, image_url } = data;
+  
+  // Build dynamic query based on provided fields
+  const fields = [];
+  const values = [];
+  let paramCount = 1;
+  
+  if (name !== undefined) {
+    fields.push(`name = $${paramCount}`);
+    values.push(name);
+    paramCount++;
+  }
+  if (price !== undefined) {
+    fields.push(`price = $${paramCount}`);
+    values.push(price);
+    paramCount++;
+  }
+  if (stock !== undefined) {
+    fields.push(`stock = $${paramCount}`);
+    values.push(stock);
+    paramCount++;
+  }
+  if (description !== undefined) {
+    fields.push(`description = $${paramCount}`);
+    values.push(description || '');
+    paramCount++;
+  }
+  if (category !== undefined) {
+    fields.push(`category = $${paramCount}`);
+    values.push(category || '');
+    paramCount++;
+  }
+  if (brand !== undefined) {
+    fields.push(`brand = $${paramCount}`);
+    values.push(brand || '');
+    paramCount++;
+  }
+  if (sku !== undefined) {
+    fields.push(`sku = $${paramCount}`);
+    values.push(sku || '');
+    paramCount++;
+  }
+  if (image_url !== undefined) {
+    fields.push(`image_url = $${paramCount}`);
+    values.push(image_url);
+    paramCount++;
+  }
+  
+  if (fields.length === 0) {
+    throw new Error('No fields to update');
+  }
+  
+  values.push(id);
+  
+  const query = `UPDATE products SET ${fields.join(', ')} WHERE id = $${paramCount} RETURNING *`;
+  
+  try {
+    const res = await pool.query(query, values);
+    return res.rows[0];
+  } catch (error) {
+    // If columns don't exist, provide helpful error message
+    if (error.message.includes('column') && error.message.includes('does not exist')) {
+      throw new Error('Database schema needs to be updated. Please run the migration script: add_product_image_fields.sql');
+    }
+    throw error;
+  }
 };
 
 const deleteProduct = async (id) => {

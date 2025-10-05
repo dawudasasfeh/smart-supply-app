@@ -4,6 +4,7 @@ import 'package:flutter_application_2/services/api_service.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart';
+import '../../widgets/delivery_bottom_navigation.dart';
 
 class DeliveryProfilePage extends StatefulWidget {
   const DeliveryProfilePage({super.key});
@@ -45,7 +46,7 @@ Future<void> _loadProfileData() async {
       'token': token,
       'phone': profile['phone'] ?? 'N/A',
       'vehicleType': profile['vehicle_type'] ?? 'N/A',
-      'licensePlate': profile['license_plate'] ?? 'N/A',
+      'licensePlate': profile['plate_number'] ?? 'N/A',
       'memberSince': profile['created_at']?.split('T').first ?? 'N/A',
     };
     setState(() => profileData = data.cast<String, String>());
@@ -161,33 +162,38 @@ Future<void> _loadProfileData() async {
                   onCopy: () => _copyToClipboard(profileData!['token']!, 'Token'),
                 ),
 
-                const SizedBox(height: 60),
+                // Edit Profile Button
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 20),
+                  child: ElevatedButton.icon(
+                    icon: const Icon(Icons.edit_outlined),
+                    label: Text(
+                      "Edit Profile",
+                      style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 18),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      backgroundColor: accentColor,
+                      shadowColor: accentColor.withOpacity(0.4),
+                      elevation: 8,
+                    ),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => EditProfilePage(role: profileData!['role']!),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+
+                const SizedBox(height: 80), // Extra space for bottom navigation
               ],
             ),
-      bottomNavigationBar: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-        child: ElevatedButton.icon(
-          icon: const Icon(Icons.edit_outlined),
-          label: Text(
-            "Edit Profile",
-            style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 18),
-          ),
-          style: ElevatedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            backgroundColor: accentColor,
-            shadowColor: accentColor != null ? accentColor.withOpacity(0.4) : null,
-            elevation: 8,
-          ),
-          onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => EditProfilePage(role: profileData!['role']!),
-            ),
-          );
-        },
-        ),
+      bottomNavigationBar: const DeliveryBottomNavigation(
+        currentRoute: '/deliveryProfile',
       ),
     );
   }

@@ -1,12 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 // Services
 import 'services/socket_service.dart';
 
 // Theme
-import 'theme/app_theme.dart';
 import 'theme/theme_provider.dart';
+import 'themes/role_theme_manager.dart';
+
+// Localization
+import 'l10n/language_provider.dart';
+import 'l10n/app_localizations.dart';
 
 // Auth
 import 'screens/EditProfile_page.dart';
@@ -15,27 +21,32 @@ import 'screens/payment_Page.dart';
 import 'screens/signup_page.dart';
 
 // Supermarket
-import 'screens/supermarket/browseproduct_page.dart';
-import 'screens/supermarket/cart_page.dart';
-import 'screens/supermarket/orders_page.dart';
-import 'screens/supermarket/inventory_page.dart';
-import 'screens/supermarket/offers_page.dart';
-import 'screens/supermarket/supermarket_main.dart';
-import 'screens/supermarket/chat_page.dart';
-import 'screens/supermarket/profile_page.dart';
+import 'screens/SuperMarket/BrowseProduct_Page.dart';
+import 'screens/SuperMarket/Cart_Page.dart';
+import 'screens/SuperMarket/Inventory_Page.dart';
+import 'screens/SuperMarket/Offers_Page.dart';
+import 'screens/SuperMarket/profile_page_final.dart';
+import 'screens/SuperMarket/SuperMarket_Main.dart';
+import 'screens/SuperMarket/Chat_Page.dart';
 
 // Distributor
 import 'screens/distributor/dashboard_page.dart';
+import 'screens/Distributor/Distributor_Main.dart';
 import 'screens/distributor/manageproducts_page.dart';
 import 'screens/distributor/addproduct_page.dart';
 import 'screens/distributor/editproduct_page.dart';
-import 'screens/distributor/incomingorders_page.dart';  // Note renamed import, ensure consistent
+import 'screens/Distributor/IncomingOrders_Page.dart';
 import 'screens/distributor/manageoffers_page.dart';
 import 'screens/distributor/addoffer_page.dart';
 import 'screens/distributor/chat_page.dart';
 import 'screens/distributor/profile_page.dart';
-import 'screens/distributor/deliverymanagement_page.dart';
+import 'screens/Distributor/DeliveryManagement_Page.dart';
 import 'screens/distributor/AssignedOrdersDetails_page.dart';
+import 'screens/distributor/deliverytracking_page.dart';
+import 'screens/distributor/deliveryanalytics_page.dart';
+import 'screens/demo/role_theme_demo.dart';
+import 'screens/demo/dashboard_theme_showcase.dart';
+// Smart Assignment - Removed old system, now integrated in distributor dashboard
 
 // Delivery
 import 'screens/delivery/dashboard_page.dart';
@@ -44,8 +55,7 @@ import 'screens/delivery/deliveredorders_page.dart';
 import 'screens/delivery/profile_page.dart';
 
 // Common
-import 'screens/settings_page.dart';
-import 'screens/enhanced_settings_page.dart';
+import 'screens/common/enhanced_settings_page.dart';
 import 'screens/chat/chat_list_page.dart';
 import 'screens/chat/add_chat_page.dart';
 
@@ -54,13 +64,18 @@ import 'screens/qr_code/qr_generator_page.dart';
 import 'screens/qr_code/qr_scanner_page.dart';
 import 'screens/analytics_dashboard.dart';
 import 'screens/rating_system_page.dart';
+import 'screens/payment/payment_page.dart';
+import 'screens/payment/payment_methods_page.dart';
 
 final RouteObserver<ModalRoute<void>> routeObserver = RouteObserver<ModalRoute<void>>();
 
 void main() {
   runApp(
-    ChangeNotifierProvider(
-      create: (context) => ThemeProvider(),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider(create: (_) => LanguageProvider()),
+      ],
       child: const SupplyChainApp(),
     ),
   );
@@ -80,6 +95,24 @@ class _SupplyChainAppState extends State<SupplyChainApp> with WidgetsBindingObse
     WidgetsBinding.instance.addObserver(this);
     // Initialize Socket.IO connection
     SocketService.instance.connect();
+    // Initialize role-based theming
+    _initializeRoleTheme();
+  }
+  
+  Future<void> _initializeRoleTheme() async {
+    // Get user role from SharedPreferences and set theme
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userRole = prefs.getString('role') ?? 'supermarket';
+      RoleThemeManager.setUserRole(userRole);
+      if (mounted) {
+        setState(() {}); // Trigger rebuild with new theme
+      }
+    } catch (e) {
+      print('Error initializing role theme: $e');
+      // Default to supermarket theme
+      RoleThemeManager.setUserRole('supermarket');
+    }
   }
 
   @override
@@ -106,14 +139,31 @@ class _SupplyChainAppState extends State<SupplyChainApp> with WidgetsBindingObse
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<ThemeProvider>(
-      builder: (context, themeProvider, child) {
+    return Consumer2<ThemeProvider, LanguageProvider>(
+      builder: (context, themeProvider, languageProvider, child) {
         return MaterialApp(
           title: 'Smart Supply Chain',
           debugShowCheckedModeBanner: false,
-          theme: AppTheme.lightTheme,
-          darkTheme: AppTheme.darkTheme,
+          
+          // Localization
+          locale: languageProvider.locale,
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: const [
+            Locale('en', ''),
+            Locale('ar', ''),
+          ],
+          
+          // Theme
+          theme: RoleThemeManager.getCurrentTheme(isDark: false),
+          darkTheme: RoleThemeManager.getCurrentTheme(isDark: true),
           themeMode: themeProvider.themeMode,
+          
+          // Navigation
           initialRoute: '/',
           navigatorObservers: [routeObserver],
           onGenerateRoute: (settings) {
@@ -122,11 +172,20 @@ class _SupplyChainAppState extends State<SupplyChainApp> with WidgetsBindingObse
         switch (settings.name) {
           // 🔐 Auth
           case '/':
+            return MaterialPageRoute(builder: (_) => const SignupPage());
+          case '/login':
             return MaterialPageRoute(builder: (_) => const LoginPage());
           case '/signup':
             return MaterialPageRoute(builder: (_) => const SignupPage());
 
           // 🏪 Supermarket
+          case '/supermarket':
+            if (args is Map<String, dynamic> && args.containsKey('initialIndex')) {
+              return MaterialPageRoute(
+                builder: (_) => SuperMarketMain(initialIndex: args['initialIndex']),
+              );
+            }
+            return MaterialPageRoute(builder: (_) => const SuperMarketMain());
           case '/supermarketDashboard':
             return MaterialPageRoute(builder: (_) => const SuperMarketMain());
           case '/browseProducts':
@@ -134,7 +193,7 @@ class _SupplyChainAppState extends State<SupplyChainApp> with WidgetsBindingObse
           case '/cart':
             return MaterialPageRoute(builder: (_) => const CartPage());
           case '/orderHistory':
-            return MaterialPageRoute(builder: (_) => const OrdersPage());
+            return MaterialPageRoute(builder: (_) => const SuperMarketMain(initialIndex: 2));
           case '/inventory':
             return MaterialPageRoute(builder: (_) => const InventoryPage());
           case '/offers':
@@ -144,6 +203,16 @@ class _SupplyChainAppState extends State<SupplyChainApp> with WidgetsBindingObse
 
           // 🟨 Distributor
           case '/distributorDashboard':
+            return MaterialPageRoute(builder: (_) => const DistributorMain());
+          case '/distributor':
+            if (args is Map<String, dynamic> && args.containsKey('initialIndex')) {
+              return MaterialPageRoute(
+                builder: (_) => DistributorMain(initialIndex: args['initialIndex']),
+              );
+            }
+            return MaterialPageRoute(builder: (_) => const DistributorMain());
+          case '/smartAssignment':
+            // Smart assignment is now integrated in the distributor dashboard
             return MaterialPageRoute(builder: (_) => const DistributorDashboard());
           case '/manageProducts':
             return MaterialPageRoute(builder: (_) => const ManageProductsPage());
@@ -155,7 +224,7 @@ class _SupplyChainAppState extends State<SupplyChainApp> with WidgetsBindingObse
             }
             return _errorRoute('Missing product data for EditProductPage');
           case '/supplierOrders': // renamed to match import
-            return MaterialPageRoute(builder: (_) => const SupplierOrdersPage());
+            return MaterialPageRoute(builder: (_) => const IncomingOrdersPage());
           case '/manageOffers':
             return MaterialPageRoute(builder: (_) => const ManageOffersPage());
           case '/addOffer':
@@ -164,6 +233,8 @@ class _SupplyChainAppState extends State<SupplyChainApp> with WidgetsBindingObse
                 builder: (_) => AddOfferPage(
                   productId: args['productId'],
                   productName: args['productName'],
+                  originalPrice: args['originalPrice'],
+                  productImage: args['productImage'],
                 ),
               );
             }
@@ -179,6 +250,14 @@ class _SupplyChainAppState extends State<SupplyChainApp> with WidgetsBindingObse
               );
             }
             return _errorRoute('Missing deliveryId for AssignedOrdersDetailsPage');
+          case '/deliveryTracking':
+            return MaterialPageRoute(
+              builder: (_) => const DeliveryTrackingPage(),
+            );
+          case '/deliveryAnalytics':
+            return MaterialPageRoute(
+              builder: (_) => const DeliveryAnalyticsPage(),
+            );
 
           // 🚚 Delivery
           case '/deliveryDashboard':
@@ -248,11 +327,31 @@ class _SupplyChainAppState extends State<SupplyChainApp> with WidgetsBindingObse
               builder: (_) => const RatingSystemPage(userRole: 'supermarket'),
             );
           
+          // 💳 Payment System
+          case '/payment':
+            if (args is Map<String, dynamic>) {
+              return MaterialPageRoute(
+                builder: (_) => PaymentPage(
+                  order: args['order'],
+                  totalAmount: args['totalAmount'],
+                  items: args['items'],
+                ),
+              );
+            }
+            return _errorRoute('Missing payment data');
+          case '/paymentMethods':
+            return MaterialPageRoute(builder: (_) => const PaymentMethodsPage());
+          
           // ⚙️ Settings
           case '/settings':
             return MaterialPageRoute(builder: (_) => const EnhancedSettingsPage());
-          case '/settingsOld':
-            return MaterialPageRoute(builder: (_) => const SettingsPage());
+          // Removed old settings route
+
+          // 🎨 Theme Demo
+          case '/themeDemo':
+            return MaterialPageRoute(builder: (_) => const RoleThemeDemo());
+          case '/dashboardShowcase':
+            return MaterialPageRoute(builder: (_) => const DashboardThemeShowcase());
 
           default:
             return _errorRoute('Page not found: ${settings.name}');

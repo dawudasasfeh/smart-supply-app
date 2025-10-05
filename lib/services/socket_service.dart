@@ -1,6 +1,7 @@
-import 'package:socket_io_client/socket_io_client.dart' as IO;
-import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
+import 'package:socket_io_client/socket_io_client.dart' as IO;
+import 'api_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class SocketService {
   static SocketService? _instance;
@@ -20,12 +21,18 @@ class SocketService {
       StreamController<Map<String, dynamic>>.broadcast();
   final StreamController<Map<String, dynamic>> _messageStatusController = 
       StreamController<Map<String, dynamic>>.broadcast();
+  final StreamController<Map<String, dynamic>> _orderController = 
+      StreamController<Map<String, dynamic>>.broadcast();
+  final StreamController<Map<String, dynamic>> _deliveryController = 
+      StreamController<Map<String, dynamic>>.broadcast();
   
   // Getters for streams
   Stream<Map<String, dynamic>> get messageStream => _messageController.stream;
   Stream<Map<String, dynamic>> get typingStream => _typingController.stream;
   Stream<Map<String, dynamic>> get onlineStatusStream => _onlineStatusController.stream;
   Stream<Map<String, dynamic>> get messageStatusStream => _messageStatusController.stream;
+  Stream<Map<String, dynamic>> get orderStream => _orderController.stream;
+  Stream<Map<String, dynamic>> get deliveryStream => _deliveryController.stream;
   
   bool get isConnected => _isConnected;
   
@@ -34,7 +41,7 @@ class SocketService {
     
     try {
       print('Attempting to connect to Socket.IO server...');
-      _socket = IO.io('http://10.0.2.2:5000', <String, dynamic>{
+      _socket = IO.io('${ApiService.imageBaseUrl}', <String, dynamic>{
         'transports': ['websocket', 'polling'],
         'autoConnect': false,
         'forceNew': true,
@@ -143,6 +150,58 @@ class SocketService {
         });
       }
     });
+    
+    // Listen for order events
+    _socket!.on('new_order', (data) {
+      print('New order received: $data');
+      if (!_orderController.isClosed) {
+        _orderController.add({
+          'type': 'new_order',
+          'data': Map<String, dynamic>.from(data)
+        });
+      }
+    });
+    
+    _socket!.on('order_updated', (data) {
+      print('Order updated: $data');
+      if (!_orderController.isClosed) {
+        _orderController.add({
+          'type': 'order_updated',
+          'data': Map<String, dynamic>.from(data)
+        });
+      }
+    });
+    
+    _socket!.on('order_assigned', (data) {
+      print('Order assigned: $data');
+      if (!_orderController.isClosed) {
+        _orderController.add({
+          'type': 'order_assigned',
+          'data': Map<String, dynamic>.from(data)
+        });
+      }
+    });
+    
+    // Listen for delivery events
+    _socket!.on('delivery_status_updated', (data) {
+      print('Delivery status updated: $data');
+      if (!_deliveryController.isClosed) {
+        _deliveryController.add({
+          'type': 'delivery_status_updated',
+          'data': Map<String, dynamic>.from(data)
+        });
+      }
+    });
+    
+    _socket!.on('delivery_assigned', (data) {
+      print('Delivery assigned: $data');
+      if (!_deliveryController.isClosed) {
+        _deliveryController.add({
+          'type': 'delivery_assigned',
+          'data': Map<String, dynamic>.from(data)
+        });
+      }
+    });
   }
   
   Future<void> _joinWithUserData() async {
@@ -210,5 +269,7 @@ class SocketService {
     _typingController.close();
     _onlineStatusController.close();
     _messageStatusController.close();
+    _orderController.close();
+    _deliveryController.close();
   }
 }

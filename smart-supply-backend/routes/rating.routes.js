@@ -24,4 +24,10 @@ router.get('/user/:userId/:role', ratingController.getUserRatings);
 // GET /api/ratings/stats - Get rating statistics for dashboard
 router.get('/stats', ratingController.getRatingStats);
 
+// GET /api/ratings/summary/:userId/:userRole - Get rating summary for any user/role
+router.get('/summary/:userId/:userRole', ratingController.getRatingSummary);
+
+// GET /api/ratings/detailed/:userId/:userRole - Get detailed ratings with individual reviews
+router.get('/detailed/:userId/:userRole', ratingController.getDetailedRatings);
+
 module.exports = router;

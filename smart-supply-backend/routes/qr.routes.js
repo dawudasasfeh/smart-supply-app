@@ -90,19 +90,67 @@ router.post('/verify-delivery', async (req, res) => {
       });
     }
 
-    // Only allow verification of accepted orders
-    if (order.status !== 'Accepted') {
-      console.log('❌ QR verification FAILED - order not accepted, status:', order.status);
+    // Only allow verification of assigned orders (case-insensitive)
+    // Check both 'assigned' and 'accepted' statuses for backward compatibility
+    const validStatuses = ['assigned', 'accepted'];
+    if (!validStatuses.includes((order.status || '').toString().toLowerCase())) {
+      console.log('❌ QR verification FAILED - order not assigned, status:', order.status);
       return res.status(400).json({
         success: false,
-        message: `Order cannot be verified. Current status: ${order.status}. Only accepted orders can be delivered.`,
-        error: 'ORDER_NOT_ACCEPTED'
+        message: `Order cannot be verified. Current status: ${order.status}. Only assigned orders can be delivered.`,
+        error: 'ORDER_NOT_ASSIGNED'
       });
     }
 
-    // Update order status to delivered
-    const updateQuery = 'UPDATE orders SET status = $1, delivered_at = NOW() WHERE id = $2';
-    await db.query(updateQuery, ['delivered', order_id]);
+  // Update order status to delivered
+  const updateQuery = 'UPDATE orders SET status = $1, actual_delivery_date = NOW() WHERE id = $2';
+  await db.query(updateQuery, ['delivered', order_id]);
+  
+  // Also update delivery assignment status if it exists
+  const updateAssignmentQuery = 'UPDATE delivery_assignments SET status = $1, updated_at = NOW() WHERE order_id = $2';
+  await db.query(updateAssignmentQuery, ['delivered', order_id]);
+  
+  // Create/update delivery analytics data for QR verified deliveries
+  try {
+    const orderResult = await db.query(
+      `SELECT o.distributor_id, da.delivery_man_id, o.created_at, o.actual_delivery_date
+       FROM orders o
+       LEFT JOIN delivery_assignments da ON o.id = da.order_id
+       WHERE o.id = $1`,
+      [order_id]
+    );
+
+    if (orderResult.rows.length > 0) {
+      const order = orderResult.rows[0];
+      const deliveryTime = order.actual_delivery_date ? 
+        new Date(order.actual_delivery_date) - new Date(order.created_at) : 0;
+      
+      await db.query(`
+        INSERT INTO delivery_analytics 
+        (distributor_id, order_id, delivery_man_id, status, delivery_time_minutes, verification_method, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+        ON CONFLICT (order_id) 
+        DO UPDATE SET 
+          status = EXCLUDED.status,
+          delivery_time_minutes = EXCLUDED.delivery_time_minutes,
+          verification_method = EXCLUDED.verification_method,
+          updated_at = NOW()
+      `, [
+        order.distributor_id,
+        order_id,
+        order.delivery_man_id,
+        'delivered',
+        Math.round(deliveryTime / (1000 * 60)), // Convert to minutes
+        'qr_verification'
+      ]);
+      
+      console.log(`📊 Analytics data created for QR verified order ${order_id}`);
+    }
+  } catch (analyticsError) {
+    console.warn('Failed to create analytics data for QR verified order:', analyticsError);
+  }
+  
+  console.log('Order marked as delivered by QR verification:', { order_id });
 
     // Log the verification event
     const logQuery = `

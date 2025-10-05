@@ -189,23 +189,28 @@ class EnhancedDashboardBase extends StatelessWidget {
       case 'supermarket':
         items = [
           const BottomNavigationBarItem(
-            icon: Icon(Icons.dashboard),
+            icon: Icon(Icons.dashboard_outlined),
+            activeIcon: Icon(Icons.dashboard),
             label: 'Dashboard',
           ),
           const BottomNavigationBarItem(
-            icon: Icon(Icons.inventory),
+            icon: Icon(Icons.inventory_outlined),
+            activeIcon: Icon(Icons.inventory),
             label: 'Inventory',
           ),
           const BottomNavigationBarItem(
-            icon: Icon(Icons.shopping_cart),
+            icon: Icon(Icons.shopping_cart_outlined),
+            activeIcon: Icon(Icons.shopping_cart),
             label: 'Orders',
           ),
           const BottomNavigationBarItem(
-            icon: Icon(Icons.star),
+            icon: Icon(Icons.star_outline),
+            activeIcon: Icon(Icons.star),
             label: 'Ratings',
           ),
           const BottomNavigationBarItem(
-            icon: Icon(Icons.chat),
+            icon: Icon(Icons.chat_outlined),
+            activeIcon: Icon(Icons.chat),
             label: 'Chat',
           ),
         ];
@@ -213,23 +218,28 @@ class EnhancedDashboardBase extends StatelessWidget {
       case 'distributor':
         items = [
           const BottomNavigationBarItem(
-            icon: Icon(Icons.dashboard),
+            icon: Icon(Icons.dashboard_outlined),
+            activeIcon: Icon(Icons.dashboard),
             label: 'Dashboard',
           ),
           const BottomNavigationBarItem(
-            icon: Icon(Icons.inventory_2),
+            icon: Icon(Icons.inventory_2_outlined),
+            activeIcon: Icon(Icons.inventory_2),
             label: 'Products',
           ),
           const BottomNavigationBarItem(
-            icon: Icon(Icons.local_shipping),
+            icon: Icon(Icons.local_shipping_outlined),
+            activeIcon: Icon(Icons.local_shipping),
             label: 'Orders',
           ),
           const BottomNavigationBarItem(
-            icon: Icon(Icons.star),
+            icon: Icon(Icons.star_outline),
+            activeIcon: Icon(Icons.star),
             label: 'Ratings',
           ),
           const BottomNavigationBarItem(
-            icon: Icon(Icons.analytics),
+            icon: Icon(Icons.analytics_outlined),
+            activeIcon: Icon(Icons.analytics),
             label: 'Analytics',
           ),
         ];
@@ -237,23 +247,28 @@ class EnhancedDashboardBase extends StatelessWidget {
       case 'delivery':
         items = [
           const BottomNavigationBarItem(
-            icon: Icon(Icons.dashboard),
+            icon: Icon(Icons.dashboard_outlined),
+            activeIcon: Icon(Icons.dashboard),
             label: 'Dashboard',
           ),
           const BottomNavigationBarItem(
-            icon: Icon(Icons.assignment),
+            icon: Icon(Icons.assignment_outlined),
+            activeIcon: Icon(Icons.assignment),
             label: 'Orders',
           ),
           const BottomNavigationBarItem(
-            icon: Icon(Icons.history),
+            icon: Icon(Icons.history_outlined),
+            activeIcon: Icon(Icons.history),
             label: 'History',
           ),
           const BottomNavigationBarItem(
-            icon: Icon(Icons.star),
+            icon: Icon(Icons.star_outline),
+            activeIcon: Icon(Icons.star),
             label: 'Ratings',
           ),
           const BottomNavigationBarItem(
-            icon: Icon(Icons.person),
+            icon: Icon(Icons.person_outlined),
+            activeIcon: Icon(Icons.person),
             label: 'Profile',
           ),
         ];
@@ -262,11 +277,45 @@ class EnhancedDashboardBase extends StatelessWidget {
         items = [];
     }
 
-    return BottomNavigationBar(
-      type: BottomNavigationBarType.fixed,
-      currentIndex: 0,
-      onTap: (index) => _handleBottomNavTap(context, index),
-      items: items,
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.shadow,
+            blurRadius: 16,
+            offset: const Offset(0, -4),
+          ),
+        ],
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(20),
+          topRight: Radius.circular(20),
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(20),
+          topRight: Radius.circular(20),
+        ),
+        child: BottomNavigationBar(
+          type: BottomNavigationBarType.fixed,
+          currentIndex: 0,
+          onTap: (index) => _handleBottomNavTap(context, index),
+          backgroundColor: AppColors.surface,
+          selectedItemColor: AppColors.primary,
+          unselectedItemColor: AppColors.textTertiary,
+          selectedLabelStyle: const TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 11,
+          ),
+          unselectedLabelStyle: const TextStyle(
+            fontWeight: FontWeight.w500,
+            fontSize: 10,
+          ),
+          elevation: 0,
+          items: items,
+        ),
+      ),
     );
   }
 

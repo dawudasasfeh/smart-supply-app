@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:intl/intl.dart';
 import '../../services/api_service.dart';
 import '../../theme/app_colors.dart';
-import 'package:intl/intl.dart';
+import '../../widgets/delivery_bottom_navigation.dart';
+import 'OrderDetailsPage.dart';
 
 class AssignedOrdersPage extends StatefulWidget {
   const AssignedOrdersPage({super.key});
@@ -11,29 +14,52 @@ class AssignedOrdersPage extends StatefulWidget {
   State<AssignedOrdersPage> createState() => _AssignedOrdersPageState();
 }
 
-class _AssignedOrdersPageState extends State<AssignedOrdersPage> with TickerProviderStateMixin {
+class _AssignedOrdersPageState extends State<AssignedOrdersPage>
+    with SingleTickerProviderStateMixin {
+  // Data Management
   List<dynamic> assignedOrders = [];
   List<dynamic> filteredOrders = [];
-  int? deliveryId;
   bool isLoading = true;
   String selectedFilter = 'All';
-  final TextEditingController _searchController = TextEditingController();
+  int? deliveryId;
+
+  // Animation Controller
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
+  
+  // Controllers
+  late TextEditingController _searchController;
 
-  final List<String> filterOptions = ['All', 'Assigned', 'Delivered'];
+  // Filter Options
+  final List<String> filterOptions = ['All', 'Active', 'Delivered'];
 
   @override
   void initState() {
     super.initState();
+    _initializeComponents();
+    _loadDeliveryData();
+  }
+
+  void _initializeComponents() {
     _animationController = AnimationController(
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 600),
       vsync: this,
     );
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
-    );
-    loadDeliveryIdAndFetch();
+    
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeOut,
+    ));
+    
+    _searchController = TextEditingController();
+    _searchController.addListener(_onSearchChanged);
+  }
+
+  void _onSearchChanged() {
+    _filterOrders();
   }
 
   @override
@@ -43,136 +69,149 @@ class _AssignedOrdersPageState extends State<AssignedOrdersPage> with TickerProv
     super.dispose();
   }
 
-  Future<void> loadDeliveryIdAndFetch() async {
+  // Data Loading Methods
+  Future<void> _loadDeliveryData() async {
     final prefs = await SharedPreferences.getInstance();
-    deliveryId = prefs.getInt('user_id');
+    final cachedDeliveryId = prefs.getInt('delivery_man_id');
+    final storedUserId = prefs.getInt('user_id') ?? prefs.getInt('userId');
+    final storedName = prefs.getString('username');
+    final storedEmail = prefs.getString('user_email');
+
+    deliveryId = cachedDeliveryId;
+
+    if (deliveryId == null) {
+      try {
+        final deliveryMen = await ApiService.getAvailableDeliveryMen();
+        Map<String, dynamic> match = {};
+
+        if (storedEmail != null && storedEmail.isNotEmpty) {
+          match = deliveryMen.firstWhere(
+            (dm) => (dm['email'] ?? '').toString() == storedEmail,
+            orElse: () => {},
+          );
+        }
+
+        if (match.isEmpty && storedName != null && storedName.isNotEmpty) {
+          match = deliveryMen.firstWhere(
+            (dm) => (dm['name'] ?? '').toString() == storedName,
+            orElse: () => {},
+          );
+        }
+
+        if (match.isEmpty && storedUserId != null) {
+          match = deliveryMen.firstWhere((dm) {
+            final dmId = dm['id'];
+            final dmUserId = dm['user_id'];
+            return (dmId == storedUserId) || (dmUserId == storedUserId);
+          }, orElse: () => {});
+        }
+
+        if (match.isNotEmpty && match.containsKey('id')) {
+          final idVal = match['id'];
+          if (idVal is int) {
+            deliveryId = idVal;
+            await prefs.setInt('delivery_man_id', deliveryId!);
+          }
+        }
+      } catch (e) {
+        print('Error resolving delivery_man_id: $e');
+      }
+    }
+
     if (deliveryId != null) {
-      fetchAssignedOrders();
+      await _fetchAssignedOrders();
     }
   }
 
-  Future<void> fetchAssignedOrders() async {
+  Future<void> _fetchAssignedOrders() async {
+    if (!mounted) return;
+    
     setState(() => isLoading = true);
+    
     try {
       if (deliveryId == null) return;
+      
       final orders = await ApiService.getAssignedOrders(deliveryId!);
-      setState(() {
-        assignedOrders = orders; // Include all orders (assigned and delivered)
-        filteredOrders = orders;
-        isLoading = false;
-      });
-      _animationController.forward();
-    } catch (e) {
-      setState(() => isLoading = false);
+      
       if (mounted) {
+        setState(() {
+          assignedOrders = orders;
+          filteredOrders = orders;
+          isLoading = false;
+        });
+        
+        _animationController.forward();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error loading orders: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.error,
           ),
         );
       }
     }
   }
 
-  void _filterOrders(String filter) {
+  // Filter and Search Methods
+  void _filterOrders() {
+    if (!mounted) return;
+    
+    setState(() {
+      String query = _searchController.text.toLowerCase();
+      
+      List<dynamic> filtered = assignedOrders.where((order) {
+        // Search filter
+        bool matchesSearch = query.isEmpty ||
+            order['id'].toString().contains(query) ||
+            (order['customer_name'] ?? '').toString().toLowerCase().contains(query);
+        
+        // Status filter
+        bool matchesStatus = true;
+        if (selectedFilter != 'All') {
+          final status = (order['status'] ?? order['delivery_status'] ?? '').toString().toLowerCase();
+          if (selectedFilter == 'Active') {
+            matchesStatus = status != 'delivered' && status != 'completed';
+          } else if (selectedFilter == 'Delivered') {
+            matchesStatus = status == 'delivered' || status == 'completed';
+          }
+        }
+        
+        return matchesSearch && matchesStatus;
+      }).toList();
+      
+      filteredOrders = filtered;
+    });
+  }
+
+  void _onFilterSelected(String filter) {
     setState(() {
       selectedFilter = filter;
-      if (filter == 'All') {
-        filteredOrders = assignedOrders;
-      } else if (filter == 'Assigned') {
-        filteredOrders = assignedOrders.where((order) => 
-          order['status'].toString().toLowerCase() != 'delivered'
-        ).toList();
-      } else if (filter == 'Delivered') {
-        filteredOrders = assignedOrders.where((order) => 
-          order['status'].toString().toLowerCase() == 'delivered'
-        ).toList();
-      } else {
-        filteredOrders = assignedOrders.where((order) => 
-          order['status'].toString().toLowerCase().contains(filter.toLowerCase())
-        ).toList();
-      }
     });
+    _filterOrders();
   }
 
-  void _searchOrders(String query) {
-    setState(() {
-      if (query.isEmpty) {
-        filteredOrders = selectedFilter == 'All' ? assignedOrders : 
-          assignedOrders.where((order) => 
-            order['status'].toString().toLowerCase().contains(selectedFilter.toLowerCase())
-          ).toList();
-      } else {
-        filteredOrders = assignedOrders.where((order) {
-          final matchesSearch = order['id'].toString().contains(query) ||
-                               order['status'].toString().toLowerCase().contains(query.toLowerCase());
-          final matchesFilter = selectedFilter == 'All' || 
-                               order['status'].toString().toLowerCase().contains(selectedFilter.toLowerCase());
-          return matchesSearch && matchesFilter;
-        }).toList();
-      }
-    });
-  }
-
-  Future<void> markDelivered(int orderId) async {
-    if (deliveryId == null) return;
-    
-    // Show confirmation dialog
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Confirm Delivery'),
-        content: Text('Mark Order #$orderId as delivered?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-            child: const Text('Confirm'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      final success = await ApiService.updateDeliveryStatus(
-        orderId: orderId,
-        deliveryId: deliveryId!,
-        status: 'delivered',
-      );
-      if (success) {
-        fetchAssignedOrders();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Order marked as delivered successfully!'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Failed to update order status'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
-    }
-  }
-
+  // Status Helper Methods
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'pending':
-        return Colors.orange;
+        return AppColors.warning;
+      case 'accepted':
+        return AppColors.info;
+      case 'assigned':
+        return AppColors.primary;
+      case 'picked_up':
+        return Colors.purple;
+      case 'in_transit':
+        return Colors.blue;
+      case 'out_for_delivery':
+        return Colors.indigo;
       case 'delivered':
-        return Colors.green;
+        return AppColors.success;
+      case 'completed':
+        return AppColors.success;
       default:
         return Colors.grey;
     }
@@ -181,9 +220,21 @@ class _AssignedOrdersPageState extends State<AssignedOrdersPage> with TickerProv
   IconData _getStatusIcon(String status) {
     switch (status.toLowerCase()) {
       case 'pending':
-        return Icons.schedule;
+        return Icons.schedule_outlined;
+      case 'accepted':
+        return Icons.assignment_turned_in_outlined;
+      case 'assigned':
+        return Icons.assignment_outlined;
+      case 'picked_up':
+        return Icons.inventory_2_outlined;
+      case 'in_transit':
+        return Icons.local_shipping_outlined;
+      case 'out_for_delivery':
+        return Icons.delivery_dining_outlined;
       case 'delivered':
-        return Icons.check_circle;
+        return Icons.check_circle_outline;
+      case 'completed':
+        return Icons.verified_outlined;
       default:
         return Icons.help_outline;
     }
@@ -198,7 +249,7 @@ class _AssignedOrdersPageState extends State<AssignedOrdersPage> with TickerProv
         backgroundColor: Colors.white,
         foregroundColor: AppColors.textPrimary,
         title: const Text(
-          'Orders',
+          'Assigned Orders',
           style: TextStyle(
             fontSize: 24,
             fontWeight: FontWeight.bold,
@@ -213,7 +264,7 @@ class _AssignedOrdersPageState extends State<AssignedOrdersPage> with TickerProv
           ),
           IconButton(
             icon: const Icon(Icons.refresh, color: AppColors.primary),
-            onPressed: fetchAssignedOrders,
+            onPressed: _fetchAssignedOrders,
             tooltip: 'Refresh Orders',
           ),
         ],
@@ -244,9 +295,8 @@ class _AssignedOrdersPageState extends State<AssignedOrdersPage> with TickerProv
                   ),
                   child: TextField(
                     controller: _searchController,
-                    onChanged: _searchOrders,
                     decoration: const InputDecoration(
-                      hintText: 'Search orders by ID or status...',
+                      hintText: 'Search orders by ID or customer...',
                       prefixIcon: Icon(Icons.search, color: Colors.grey),
                       border: InputBorder.none,
                       contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -274,7 +324,7 @@ class _AssignedOrdersPageState extends State<AssignedOrdersPage> with TickerProv
                             ),
                           ),
                           selected: isSelected,
-                          onSelected: (_) => _filterOrders(filter),
+                          onSelected: (_) => _onFilterSelected(filter),
                           backgroundColor: Colors.grey.shade200,
                           selectedColor: AppColors.primary,
                           checkmarkColor: Colors.white,
@@ -310,7 +360,7 @@ class _AssignedOrdersPageState extends State<AssignedOrdersPage> with TickerProv
                     : FadeTransition(
                         opacity: _fadeAnimation,
                         child: RefreshIndicator(
-                          onRefresh: fetchAssignedOrders,
+                          onRefresh: _fetchAssignedOrders,
                           color: AppColors.primary,
                           child: ListView.builder(
                             padding: const EdgeInsets.all(16),
@@ -324,6 +374,9 @@ class _AssignedOrdersPageState extends State<AssignedOrdersPage> with TickerProv
                       ),
           ),
         ],
+      ),
+      bottomNavigationBar: const DeliveryBottomNavigation(
+        currentRoute: '/assignedOrders',
       ),
     );
   }
@@ -340,7 +393,7 @@ class _AssignedOrdersPageState extends State<AssignedOrdersPage> with TickerProv
           ),
           const SizedBox(height: 16),
           Text(
-            'No orders assigned yet',
+            'No orders found',
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
@@ -349,7 +402,9 @@ class _AssignedOrdersPageState extends State<AssignedOrdersPage> with TickerProv
           ),
           const SizedBox(height: 8),
           Text(
-            'Orders will appear here when assigned to you',
+            selectedFilter == 'All' 
+                ? 'No orders assigned yet'
+                : 'No ${selectedFilter.toLowerCase()} orders found',
             style: TextStyle(
               fontSize: 16,
               color: Colors.grey.shade500,
@@ -357,7 +412,7 @@ class _AssignedOrdersPageState extends State<AssignedOrdersPage> with TickerProv
           ),
           const SizedBox(height: 24),
           ElevatedButton.icon(
-            onPressed: fetchAssignedOrders,
+            onPressed: _fetchAssignedOrders,
             icon: const Icon(Icons.refresh),
             label: const Text('Refresh'),
             style: ElevatedButton.styleFrom(
@@ -375,10 +430,13 @@ class _AssignedOrdersPageState extends State<AssignedOrdersPage> with TickerProv
   }
 
   Widget _buildOrderCard(Map<String, dynamic> order, int index) {
-    final status = order['status']?.toString() ?? 'Unknown';
+    final statusRaw = order['status'] ?? order['delivery_status'] ?? order['deliveryStatus'] ?? 'Unknown';
+    final status = statusRaw.toString();
     final orderId = order['id']?.toString() ?? 'N/A';
     final createdAt = order['created_at']?.toString();
     final totalAmount = order['total_amount']?.toString() ?? '0';
+    final supermarketName = order['supermarket_name']?.toString() ?? order['customer_name']?.toString() ?? order['buyer_name']?.toString() ?? 'Unknown Supermarket';
+    final deliveryAddress = order['delivery_address']?.toString() ?? 'No address provided';
     
     String formattedDate = 'Unknown date';
     if (createdAt != null) {
@@ -390,173 +448,249 @@ class _AssignedOrdersPageState extends State<AssignedOrdersPage> with TickerProv
       }
     }
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      child: Card(
-        elevation: 2,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header Row
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
+    return TweenAnimationBuilder<double>(
+      duration: Duration(milliseconds: 300 + (index * 100)),
+      tween: Tween(begin: 0.0, end: 1.0),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, child) {
+        return Transform.translate(
+          offset: Offset(0, 50 * (1 - value)),
+          child: Opacity(
+            opacity: value,
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              child: GestureDetector(
+                onTap: () => _navigateToOrderDetails(order),
+                child: Card(
+                elevation: 4,
+                shadowColor: Colors.black26,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Colors.white,
+                        Colors.grey.shade50,
+                      ],
+                    ),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Order #$orderId',
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
+                        // Header Row
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Order #$orderId',
+                                    style: const TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    formattedDate,
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.grey.shade600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            // Status Chip
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: _getStatusColor(status).withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: _getStatusColor(status).withOpacity(0.3),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    _getStatusIcon(status),
+                                    size: 16,
+                                    color: _getStatusColor(status),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    status.toUpperCase(),
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: _getStatusColor(status),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        
+                        // Customer Info
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.05),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: AppColors.primary.withOpacity(0.1),
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.person_outline,
+                                    size: 18,
+                                    color: AppColors.primary,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    supermarketName,
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Icon(
+                                    Icons.location_on_outlined,
+                                    size: 18,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      deliveryAddress,
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.grey.shade700,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          formattedDate,
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey.shade600,
-                          ),
+                        
+                        const SizedBox(height: 16),
+                        
+                        // Amount and Actions Row
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            // Amount
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Total Amount',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey.shade600,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '\$${double.tryParse(totalAmount)?.toStringAsFixed(2) ?? totalAmount}',
+                                  style: const TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            
+                            // Action Buttons
+                            Row(
+                              children: [
+                                if (status.toLowerCase() != 'delivered' && status.toLowerCase() != 'completed')
+                                  ElevatedButton.icon(
+                                    onPressed: () async {
+                                      final result = await Navigator.pushNamed(context, '/qrScanner');
+                                      if (result == true) {
+                                        await _fetchAssignedOrders();
+                                      }
+                                    },
+                                    icon: const Icon(Icons.qr_code_scanner, size: 18),
+                                    label: const Text('Scan QR'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColors.primary,
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                    ),
+                                  )
+                                else
+                                  OutlinedButton.icon(
+                                    onPressed: () {
+                                      _showOrderDetails(order);
+                                    },
+                                    icon: const Icon(Icons.info_outline, size: 18),
+                                    label: const Text('Details'),
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: AppColors.success,
+                                      side: const BorderSide(color: AppColors.success),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ],
                         ),
                       ],
                     ),
                   ),
-                  // Action Button (QR Scanner for assigned, Details for delivered)
-                  if (status.toLowerCase() != 'delivered')
-                    Container(
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: IconButton(
-                        icon: const Icon(
-                          Icons.qr_code_scanner,
-                          color: AppColors.primary,
-                          size: 24,
-                        ),
-                        onPressed: () {
-                          Navigator.pushNamed(context, '/qrScanner');
-                        },
-                        tooltip: 'Scan QR Code',
-                      ),
-                    )
-                  else
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.green.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: IconButton(
-                        icon: const Icon(
-                          Icons.info_outline,
-                          color: Colors.green,
-                          size: 24,
-                        ),
-                        onPressed: () {
-                          _showOrderDetails(order);
-                        },
-                        tooltip: 'View Details',
-                      ),
-                    ),
-                ],
+                ),
               ),
-              const SizedBox(height: 12),
-              // Status and Amount Row
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  // Status Chip
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: _getStatusColor(status).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: _getStatusColor(status).withOpacity(0.3),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          _getStatusIcon(status),
-                          size: 16,
-                          color: _getStatusColor(status),
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          status.toUpperCase(),
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: _getStatusColor(status),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  // Amount
-                  Text(
-                    '\$${double.tryParse(totalAmount)?.toStringAsFixed(2) ?? totalAmount}',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              // Action Buttons
-              Row(
-                children: [
-                  if (status.toLowerCase() != 'delivered')
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          Navigator.pushNamed(context, '/qrScanner');
-                        },
-                        icon: const Icon(Icons.qr_code_scanner, size: 18),
-                        label: const Text('Scan QR'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.primary,
-                          side: const BorderSide(color: AppColors.primary),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                      ),
-                    )
-                  else
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          _showOrderDetails(order);
-                        },
-                        icon: const Icon(Icons.info_outline, size: 18),
-                        label: const Text('View Details'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.green,
-                          side: const BorderSide(color: Colors.green),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ],
+            ),
           ),
         ),
+      );
+      },
+    );
+  }
+
+  void _navigateToOrderDetails(Map<String, dynamic> order) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => OrderDetailsPage(order: order),
       ),
     );
   }
@@ -567,7 +701,8 @@ class _AssignedOrdersPageState extends State<AssignedOrdersPage> with TickerProv
     final totalAmount = order['total_amount']?.toString() ?? '0';
     final createdAt = order['created_at']?.toString();
     final deliveredAt = order['delivered_at']?.toString();
-    final deliveryCode = order['delivery_code']?.toString() ?? 'N/A';
+    final customerName = order['customer_name']?.toString() ?? 'Unknown Customer';
+    final deliveryAddress = order['delivery_address']?.toString() ?? 'No address provided';
     
     String formattedCreatedDate = 'Unknown date';
     String formattedDeliveredDate = 'Not delivered';
@@ -594,7 +729,16 @@ class _AssignedOrdersPageState extends State<AssignedOrdersPage> with TickerProv
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text('Order #$orderId Details'),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Text(
+            'Order #$orderId Details',
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              color: AppColors.textPrimary,
+            ),
+          ),
           content: SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -602,14 +746,16 @@ class _AssignedOrdersPageState extends State<AssignedOrdersPage> with TickerProv
               children: [
                 _buildDetailRow('Status', status.toUpperCase(), _getStatusColor(status)),
                 const SizedBox(height: 12),
+                _buildDetailRow('Customer', customerName, AppColors.textPrimary),
+                const SizedBox(height: 12),
                 _buildDetailRow('Total Amount', '\$${double.tryParse(totalAmount)?.toStringAsFixed(2) ?? totalAmount}', AppColors.primary),
                 const SizedBox(height: 12),
-                _buildDetailRow('Delivery Code', deliveryCode, Colors.grey.shade700),
+                _buildDetailRow('Address', deliveryAddress, Colors.grey.shade700),
                 const SizedBox(height: 12),
                 _buildDetailRow('Order Date', formattedCreatedDate, Colors.grey.shade700),
-                if (status.toLowerCase() == 'delivered') ...[
+                if (status.toLowerCase() == 'delivered' || status.toLowerCase() == 'completed') ...[
                   const SizedBox(height: 12),
-                  _buildDetailRow('Delivered Date', formattedDeliveredDate, Colors.green),
+                  _buildDetailRow('Delivered Date', formattedDeliveredDate, AppColors.success),
                 ],
               ],
             ),
@@ -617,7 +763,10 @@ class _AssignedOrdersPageState extends State<AssignedOrdersPage> with TickerProv
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Close'),
+              child: const Text(
+                'Close',
+                style: TextStyle(color: AppColors.primary),
+              ),
             ),
           ],
         );

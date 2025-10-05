@@ -1,4 +1,5 @@
 {
     "java.configuration.updateBuildConfiguration": "interactive",
-    "postman.settings.dotenv-detection-notification-visibility": false
+    "postman.settings.dotenv-detection-notification-visibility": false,
+    "cmake.sourceDirectory": "C:/Users/User/Desktop/GP/vscode/flutter_application_2/linux"
 }

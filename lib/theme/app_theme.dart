@@ -9,9 +9,9 @@ class AppTheme {
   static const Color lightOnBackground = Color(0xFF1F2937);
   static const Color lightOnSurface = Color(0xFF374151);
 
-  // Dark Theme Colors
-  static const Color darkBackground = Color(0xFF111827);
-  static const Color darkSurface = Color(0xFF1F2937);
+  // Dark Theme Colors - True Black
+  static const Color darkBackground = Color(0xFF000000);
+  static const Color darkSurface = Color(0xFF0A0A0A);
   static const Color darkOnBackground = Color(0xFFF9FAFB);
   static const Color darkOnSurface = Color(0xFFE5E7EB);
 
@@ -271,9 +271,9 @@ class AppTheme {
       ),
     ),
     cardTheme: CardThemeData(
-      color: darkSurface,
-      elevation: 4,
-      shadowColor: Colors.black.withAlpha(76),
+      color: const Color(0xFF1A1A1A),
+      elevation: 2,
+      shadowColor: Colors.black.withAlpha(128),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
       ),
@@ -319,14 +319,14 @@ class AppTheme {
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: darkSurface,
+      fillColor: const Color(0xFF1A1A1A),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide(color: Colors.grey.shade700),
+        borderSide: const BorderSide(color: Color(0xFF2A2A2A)),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide(color: Colors.grey.shade700),
+        borderSide: const BorderSide(color: Color(0xFF2A2A2A)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
@@ -338,10 +338,10 @@ class AppTheme {
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
     ),
-    bottomNavigationBarTheme: BottomNavigationBarThemeData(
-      backgroundColor: darkSurface,
+    bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+      backgroundColor: Color(0xFF0A0A0A),
       selectedItemColor: AppColors.primary,
-      unselectedItemColor: Colors.grey.shade400,
+      unselectedItemColor: Color(0xFF9CA3AF),
       type: BottomNavigationBarType.fixed,
       elevation: 8,
     ),

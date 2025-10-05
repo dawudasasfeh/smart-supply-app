@@ -69,8 +69,11 @@ class _QRScannerPageState extends State<QRScannerPage>
     });
 
     try {
+      print('🔍 QR Scanner: Raw QR data: $qrData');
+      
       // Parse QR code data
       final Map<String, dynamic> qrPayload = jsonDecode(qrData);
+      print('🔍 QR Scanner: Parsed QR payload: $qrPayload');
       
       // Validate QR code structure
       if (qrPayload['type'] == 'delivery_verification' &&
@@ -78,12 +81,19 @@ class _QRScannerPageState extends State<QRScannerPage>
           qrPayload['supermarket_id'] != null &&
           qrPayload['verification_key'] != null) {
         
+        print('🔍 QR Scanner: Sending verification request:');
+        print('  - verificationKey: ${qrPayload['verification_key']}');
+        print('  - supermarketId: ${qrPayload['supermarket_id']}');
+        print('  - orderId: ${qrPayload['order_id']}');
+        
         // Verify with backend for real authentication
         final result = await ApiService.verifyQRDelivery(
           verificationKey: qrPayload['verification_key'],
           supermarketId: qrPayload['supermarket_id'].toString(),
           orderId: qrPayload['order_id'].toString(),
         );
+        
+        print('🔍 QR Scanner: Backend verification result: $result');
         
         if (result['success'] == true) {
           _showSuccessDialog(qrPayload);
@@ -196,8 +206,9 @@ class _QRScannerPageState extends State<QRScannerPage>
                     Expanded(
                       child: TextButton(
                         onPressed: () {
+                          // Close dialog then pop scanner page returning `true` so callers can refresh
                           Navigator.of(context).pop();
-                          Navigator.of(context).pop();
+                          Navigator.of(context).pop(true);
                         },
                         style: TextButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 12),

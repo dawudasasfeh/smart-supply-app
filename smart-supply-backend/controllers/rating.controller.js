@@ -1,4 +1,35 @@
+// GET /api/ratings/summary/:userId/:userRole - Get rating summary for any user/role
 const pool = require('../db');
+const getRatingSummary = async (req, res) => {
+  try {
+    const { userId, userRole } = req.params;
+    
+    // Normalize userRole to lowercase for consistency
+    const normalizedUserRole = userRole.toLowerCase();
+    
+    console.log('[DEBUG] getRatingSummary params:', { userId, userRole: normalizedUserRole });
+    
+    // Query rating_summaries for this user/role
+    const summaryQuery = `
+      SELECT rating_type, total_ratings, average_rating
+      FROM rating_summaries
+      WHERE user_id = $1 AND user_role = $2
+    `;
+    const result = await pool.query(summaryQuery, [userId, normalizedUserRole]);
+    console.log('[DEBUG] getRatingSummary SQL result:', result.rows);
+    res.json({
+      success: true,
+      data: result.rows
+    });
+  } catch (error) {
+    console.error('Error fetching rating summary:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch rating summary'
+    });
+  }
+};
+
 
 // Rating methodology and business rules
 const RATING_PERMISSIONS = {
@@ -46,7 +77,6 @@ const getRatingType = (raterRole, ratedRole) => {
 const getRatingCriteria = async (req, res) => {
   try {
     const { ratingType } = req.params;
-    
     if (!RATING_TYPES[ratingType]) {
       return res.status(400).json({
         success: false,
@@ -379,11 +409,100 @@ const getRatingStats = async (req, res) => {
   }
 };
 
+// GET /api/ratings/detailed/:userId/:userRole - Get detailed ratings with individual reviews
+const getDetailedRatings = async (req, res) => {
+  try {
+    const { userId, userRole } = req.params;
+    const { limit = 10, offset = 0 } = req.query;
+    
+    // Normalize userRole to lowercase for consistency
+    const normalizedUserRole = userRole.toLowerCase();
+    
+    console.log('[DEBUG] getDetailedRatings params:', { userId, userRole: normalizedUserRole, limit, offset });
+    
+    // Get individual ratings with rater details
+    const ratingsQuery = `
+      SELECT 
+        r.id,
+        r.overall_rating,
+        r.comment,
+        r.rating_type,
+        r.created_at,
+        r.rated_id,
+        r.rated_role,
+        rater.name as rater_name,
+        rater.role as rater_role,
+        rater.id as rater_id,
+        o.id as order_id
+      FROM ratings r
+      LEFT JOIN users rater ON r.rater_id = rater.id
+      LEFT JOIN orders o ON r.order_id = o.id
+      WHERE r.rated_id = $1 AND r.rated_role = $2 AND r.rating_type = 'supplier_rating'
+      ORDER BY r.created_at DESC
+      LIMIT $3 OFFSET $4
+    `;
+    
+    const ratingsResult = await pool.query(ratingsQuery, [userId, normalizedUserRole, limit, offset]);
+    
+    // Get rating criteria scores for each rating
+    const ratingsWithCriteria = [];
+    for (const rating of ratingsResult.rows) {
+      const criteriaQuery = `
+        SELECT 
+          rc.criteria_name,
+          rc.description,
+          rcs.score
+        FROM rating_criteria_scores rcs
+        JOIN rating_criteria rc ON rcs.criteria_id = rc.id
+        WHERE rcs.rating_id = $1
+        ORDER BY rc.criteria_name
+      `;
+      
+      const criteriaResult = await pool.query(criteriaQuery, [rating.id]);
+      
+      ratingsWithCriteria.push({
+        ...rating,
+        criteria_scores: criteriaResult.rows
+      });
+    }
+    
+    // Get total count for pagination
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM ratings
+      WHERE rated_id = $1 AND rated_role = $2 AND rating_type = 'supplier_rating'
+    `;
+    const countResult = await pool.query(countQuery, [userId, normalizedUserRole]);
+    
+    res.json({
+      success: true,
+      data: {
+        ratings: ratingsWithCriteria,
+        pagination: {
+          total: parseInt(countResult.rows[0].total),
+          limit: parseInt(limit),
+          offset: parseInt(offset),
+          hasMore: parseInt(offset) + parseInt(limit) < parseInt(countResult.rows[0].total)
+        }
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error fetching detailed ratings:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch detailed ratings'
+    });
+  }
+};
+
 module.exports = {
   getRatingCriteria,
   submitRating,
   getRatingAnalytics,
   getRatableEntities,
   getUserRatings,
-  getRatingStats
+  getRatingStats,
+  getRatingSummary,
+  getDetailedRatings
 };

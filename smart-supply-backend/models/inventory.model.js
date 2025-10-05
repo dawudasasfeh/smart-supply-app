@@ -30,7 +30,8 @@ const restockProduct = async ({ supermarket_id, product_id, distributor_id, quan
 const getAllInventory = async (supermarket_id) => {
   const result = await pool.query(
     `
-    SELECT ss.*, p.name AS product_name, p.description, p.price
+    SELECT ss.*, p.name AS product_name, p.description, p.price, p.brand, p.image_url,
+           ss.stock as total_quantity
     FROM supermarket_stock ss
     JOIN products p ON ss.product_id = p.id
     WHERE ss.supermarket_id = $1

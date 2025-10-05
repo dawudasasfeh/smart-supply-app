@@ -7,6 +7,8 @@ const {
   getProductsWithOffers,
   getProductsByDistributor,
 } = require('../models/product.model');
+const pool = require('../db');
+const path = require('path');
 
 const addProduct = async (req, res) => {
   try {
@@ -86,11 +88,85 @@ const restockProduct = async (req, res) => {
   }
 };
 
+// Add product with image upload
+const addProductWithImage = async (req, res) => {
+  try {
+    const { name, description, price, stock, category, brand, sku } = req.body;
+    
+    // Validate required fields
+    if (!name || !price || !stock) {
+      return res.status(400).json({ message: 'Name, price, and stock are required' });
+    }
+
+    // Get image URL if file was uploaded
+    let imageUrl = null;
+    if (req.file) {
+      // Create URL for the uploaded image
+      imageUrl = `/uploads/${req.file.filename}`;
+    }
+
+    const product = {
+      name,
+      description: description || '',
+      price: parseFloat(price),
+      stock: parseInt(stock),
+      category: category || '',
+      brand: brand || '',
+      sku: sku || '',
+      image_url: imageUrl,
+      distributor_id: req.user.id
+    };
+
+    const newProduct = await createProduct(product);
+    res.status(201).json(newProduct);
+  } catch (err) {
+    console.error('Error adding product with image:', err);
+    res.status(500).json({ message: err.message });
+  }
+};
+
+const updateProductWithImage = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, description, price, stock, category, brand, sku } = req.body;
+    const imageUrl = req.file ? `/uploads/${req.file.filename}` : null;
+
+    const updateData = {
+      name,
+      description,
+      price: parseFloat(price),
+      stock: parseInt(stock),
+      category,
+      brand,
+      sku,
+    };
+
+    // Only update image_url if a new image was uploaded
+    if (imageUrl) {
+      updateData.image_url = imageUrl;
+    }
+
+    // Use the same raw SQL model approach as other methods
+    const updatedProduct = await updateProduct(id, updateData);
+    
+    if (updatedProduct) {
+      res.json(updatedProduct);
+    } else {
+      res.status(404).json({ message: 'Product not found' });
+    }
+  } catch (error) {
+    console.error('Error updating product with image:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
 module.exports = {
   addProduct,
+  addProductWithImage,
   getProducts,
   getProduct,
   restockProduct, 
   update,
+  updateProductWithImage,
   remove,
 };
