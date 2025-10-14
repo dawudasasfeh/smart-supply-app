@@ -10,7 +10,6 @@ import '../../services/socket_service.dart';
 import '../../services/notification_service.dart';
 import '../../themes/role_theme_manager.dart';
 import '../../l10n/app_localizations.dart';
-import '../../widgets/loading_widget.dart';
 
 class IncomingOrdersPage extends StatefulWidget {
   const IncomingOrdersPage({super.key});
@@ -219,239 +218,603 @@ class _IncomingOrdersPageState extends State<IncomingOrdersPage> with TickerProv
   }
   
   Future<void> _showOrderDetails(Map<String, dynamic> order) async {
-    showModalBottomSheet(
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final locale = AppLocalizations.of(context);
+    final isRTL = locale?.isRTL == true;
+    
+    showDialog(
       context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (context) => DraggableScrollableSheet(
-        expand: false,
-        initialChildSize: 0.6,
-        minChildSize: 0.3,
-        maxChildSize: 0.9,
-        builder: (_, controller) => _buildOrderDetailsSheet(order, controller),
+      barrierDismissible: true,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(20),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 500, maxHeight: 700),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF0A0A0A) : Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            border: isDark ? Border.all(color: const Color(0xFF1F1F1F)) : null,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(isDark ? 0.3 : 0.1),
+                blurRadius: 30,
+                offset: const Offset(0, 15),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header
+              _buildOrderDetailsHeader(order, isDark, locale, isRTL),
+              
+              // Content
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Order Summary
+                      _buildOrderSummarySection(order, isDark, locale, isRTL),
+                      
+                      const SizedBox(height: 24),
+                      
+                      // Customer Information
+                      _buildCustomerInfoSection(order, isDark, locale, isRTL),
+                      
+                      const SizedBox(height: 24),
+                      
+                      // Order Items
+                      _buildOrderItemsSection(order, isDark, locale, isRTL),
+                      
+                      const SizedBox(height: 24),
+                      
+                      // Delivery Information
+                      _buildDeliveryInfoSection(order, isDark, locale, isRTL),
+                      
+                      const SizedBox(height: 24),
+                    ],
+                  ),
+                ),
+              ),
+              
+              // Actions
+              _buildOrderDetailsActions(order, isDark, locale, isRTL),
+            ],
+          ),
+        ),
       ),
     );
   }
 
-  Widget _buildOrderDetailsSheet(Map<String, dynamic> order, ScrollController controller) {
-    final dateFormat = DateFormat('MMM dd, yyyy - hh:mm a');
-    final orderDate = order['created_at'] != null 
-        ? DateTime.parse(order['created_at'])
-        : DateTime.now();
-    
-    final items = order['items'] as List<dynamic>? ?? [];
-    final totalAmount = double.tryParse(order['total_amount']?.toString() ?? '0') ?? 0;
+  // New modern order details dialog components
+  Widget _buildOrderDetailsHeader(Map<String, dynamic> order, bool isDark, AppLocalizations? locale, bool isRTL) {
+    final status = order['status']?.toString() ?? 'Unknown';
+    final orderId = order['id']?.toString() ?? 'N/A';
     
     return Container(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF111111) : const Color(0xFFF8FAFC),
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(24),
+          topRight: Radius.circular(24),
+        ),
+        border: isDark ? Border(
+          bottom: BorderSide(color: const Color(0xFF1F1F1F)),
+        ) : null,
+      ),
+      child: Row(
         children: [
-          // Header with drag handle
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: 16),
-              decoration: BoxDecoration(
-                color: Colors.grey[400],
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          
-          // Order header
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Order #${order['id']}',
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              _buildStatusChip(order['status']),
-            ],
-          ),
-          
-          const SizedBox(height: 8),
-          
-          // Order info
-          Text(
-            'Placed on ${dateFormat.format(orderDate)}',
-            style: TextStyle(
-              color: Colors.grey[600],
-              fontSize: 14,
-            ),
-          ),
-          
-          const SizedBox(height: 16),
-          
-          // Customer info
-          _buildDetailRow('Customer', order['buyer']?['name'] ?? 'N/A'),
-          _buildDetailRow('Email', order['buyer']?['email'] ?? 'N/A'),
-          _buildDetailRow('Phone', order['shipping_address']?['phone'] ?? 'N/A'),
-          
-          const SizedBox(height: 16),
-          
-          // Shipping address
-          const Text(
-            'Shipping Address',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 8),
-          if (order['shipping_address'] != null)
-            Text(
-              '${order['shipping_address']['street'] ?? ''}\n'
-              '${order['shipping_address']['city'] ?? ''}, ${order['shipping_address']['state'] ?? ''} ${order['shipping_address']['postal_code'] ?? ''}\n'
-              '${order['shipping_address']['country'] ?? ''}',
-              style: const TextStyle(fontSize: 14),
-            ),
-          
-          const SizedBox(height: 16),
-          
-          // Order items
-          const Text(
-            'Order Items',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 8),
-          
           Expanded(
-            child: ListView.builder(
-              controller: controller,
-              itemCount: items.length,
-              itemBuilder: (context, index) {
-                final item = items[index];
-                final product = item['product'] ?? {};
-                final price = double.tryParse(item['price']?.toString() ?? '0') ?? 0;
-                final quantity = int.tryParse(item['quantity']?.toString() ?? '1') ?? 1;
-                
-                return ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: product['image'] != null
-                      ? ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Image.network(
-                            product['image'],
-                            width: 50,
-                            height: 50,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Container(
-                              width: 50,
-                              height: 50,
-                              color: Colors.grey[200],
-                              child: const Icon(Icons.image_not_supported, color: Colors.grey),
-                            ),
-                          ),
-                        )
-                      : Container(
-                          width: 50,
-                          height: 50,
-                          decoration: BoxDecoration(
-                            color: Colors.grey[200],
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Icon(Icons.inventory_2_outlined, color: Colors.grey),
-                        ),
-                  title: Text(
-                    product['name'] ?? 'Product',
-                    style: const TextStyle(fontWeight: FontWeight.w500),
-                  ),
-                  subtitle: Text('Qty: $quantity'),
-                  trailing: Text(
-                    '\$${(price * quantity).toStringAsFixed(2)}',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                );
-              },
-            ),
-          ),
-          
-          // Order summary
-          const Divider(height: 24),
-          _buildSummaryRow('Subtotal', '\$${totalAmount.toStringAsFixed(2)}'),
-          _buildSummaryRow('Shipping', '\$0.00'),
-          _buildSummaryRow(
-            'Tax',
-            '\$${(totalAmount * 0.1).toStringAsFixed(2)}',
-          ),
-          const Divider(height: 24),
-          _buildSummaryRow(
-            'Total',
-            '\$${(totalAmount * 1.1).toStringAsFixed(2)}',
-            isTotal: true,
-          ),
-          
-          // Action buttons
-          const SizedBox(height: 16),
-          if (order['status'] == 'pending')
-            Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    icon: const Icon(Icons.check_circle_outline, size: 18),
-                    label: const Text('Accept Order'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.green,
-                      side: const BorderSide(color: Colors.green),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _updateOrderStatus(order['id'].toString(), 'processing');
-                    },
+                Text(
+                  isRTL ? 'طلب رقم #$orderId' : 'Order #$orderId',
+                  style: GoogleFonts.inter(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? const Color(0xFFF9FAFB) : const Color(0xFF1E293B),
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    icon: const Icon(Icons.cancel_outlined, size: 18),
-                    label: const Text('Reject'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.red,
-                      side: const BorderSide(color: Colors.red),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
+                const SizedBox(height: 8),
+                _buildCleanStatusChip(status, isDark, AppLocalizations.of(context), DistributorColors(isDark: isDark)),
+              ],
+            ),
+          ),
+          IconButton(
+            onPressed: () => Navigator.of(context).pop(),
+            icon: Icon(
+              Icons.close_rounded,
+              color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF64748B),
+            ),
+            style: IconButton.styleFrom(
+              backgroundColor: isDark ? const Color(0xFF1F1F1F) : const Color(0xFFF1F5F9),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOrderSummarySection(Map<String, dynamic> order, bool isDark, AppLocalizations? locale, bool isRTL) {
+    final createdAt = order['created_at']?.toString();
+    final totalAmount = order['total_amount']?.toString() ?? '0';
+    final items = order['items'] as List<dynamic>? ?? [];
+    final itemCount = items.length;
+    
+    DateTime orderDate = DateTime.now();
+    if (createdAt != null) {
+      try {
+        orderDate = DateTime.parse(createdAt);
+      } catch (e) {
+        orderDate = DateTime.now();
+      }
+    }
+
+    return _buildSection(
+      title: isRTL ? 'ملخص الطلب' : 'Order Summary',
+      isDark: isDark,
+      isRTL: isRTL,
+      child: Column(
+        children: [
+          _buildInfoRow(
+            icon: Icons.calendar_today_rounded,
+            label: isRTL ? 'تاريخ الطلب' : 'Order Date',
+            value: '${orderDate.day}/${orderDate.month}/${orderDate.year} ${orderDate.hour}:${orderDate.minute.toString().padLeft(2, '0')}',
+            isDark: isDark,
+            isRTL: isRTL,
+          ),
+          const SizedBox(height: 16),
+          _buildInfoRow(
+            icon: Icons.shopping_bag_rounded,
+            label: isRTL ? 'عدد المنتجات' : 'Items Count',
+            value: '$itemCount ${isRTL ? 'منتج' : 'items'}',
+            isDark: isDark,
+            isRTL: isRTL,
+          ),
+          const SizedBox(height: 16),
+          _buildInfoRow(
+            icon: Icons.attach_money_rounded,
+            label: isRTL ? 'المبلغ الإجمالي' : 'Total Amount',
+            value: 'JOD ${totalAmount}',
+            isDark: isDark,
+            isRTL: isRTL,
+            isHighlighted: true,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCustomerInfoSection(Map<String, dynamic> order, bool isDark, AppLocalizations? locale, bool isRTL) {
+    final customerName = order['buyer']?['name']?.toString() ?? 'N/A';
+    final customerPhone = order['shipping_address']?['phone']?.toString() ?? order['buyer']?['phone']?.toString() ?? 'N/A';
+    final customerEmail = order['buyer']?['email']?.toString() ?? 'N/A';
+
+    return _buildSection(
+      title: isRTL ? 'معلومات العميل' : 'Customer Information',
+      isDark: isDark,
+      isRTL: isRTL,
+      child: Column(
+        children: [
+          _buildInfoRow(
+            icon: Icons.person_rounded,
+            label: isRTL ? 'الاسم' : 'Name',
+            value: customerName,
+            isDark: isDark,
+            isRTL: isRTL,
+          ),
+          const SizedBox(height: 16),
+          _buildInfoRow(
+            icon: Icons.phone_rounded,
+            label: isRTL ? 'رقم الهاتف' : 'Phone',
+            value: customerPhone,
+            isDark: isDark,
+            isRTL: isRTL,
+          ),
+          const SizedBox(height: 16),
+          _buildInfoRow(
+            icon: Icons.email_rounded,
+            label: isRTL ? 'البريد الإلكتروني' : 'Email',
+            value: customerEmail,
+            isDark: isDark,
+            isRTL: isRTL,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOrderItemsSection(Map<String, dynamic> order, bool isDark, AppLocalizations? locale, bool isRTL) {
+    final items = order['items'] as List<dynamic>? ?? [];
+
+    return _buildSection(
+      title: isRTL ? 'منتجات الطلب' : 'Order Items',
+      isDark: isDark,
+      isRTL: isRTL,
+      child: items.isEmpty
+          ? Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1F1F1F) : const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.info_outline_rounded,
+                    color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF64748B),
+                    size: 20,
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    isRTL ? 'لا توجد تفاصيل للمنتجات' : 'No item details available',
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF64748B),
                     ),
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _showRejectDialog(order['id'].toString());
-                    },
+                  ),
+                ],
+              ),
+            )
+          : Column(
+              children: items.asMap().entries.map((entry) {
+                final index = entry.key;
+                final item = entry.value as Map<String, dynamic>;
+                return Column(
+                  children: [
+                    if (index > 0) const SizedBox(height: 12),
+                    _buildOrderItem(item, isDark, isRTL),
+                  ],
+                );
+              }).toList(),
+            ),
+    );
+  }
+
+  Widget _buildOrderItem(Map<String, dynamic> item, bool isDark, bool isRTL) {
+    final product = item['product'] as Map<String, dynamic>? ?? {};
+    final productName = product['name']?.toString() ?? item['product_name']?.toString() ?? 'Unknown Product';
+    final quantity = item['quantity']?.toString() ?? '1';
+    final price = item['price']?.toString() ?? '0';
+    final total = (double.tryParse(price) ?? 0) * (int.tryParse(quantity) ?? 1);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1F1F1F) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(12),
+        border: isDark ? Border.all(color: const Color(0xFF2D2D2D)) : null,
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1F1F1F) : const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isDark ? const Color(0xFF2D2D2D) : const Color(0xFFE2E8F0),
+                width: 1,
+              ),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(11),
+              child: _buildProductImage(item, product, isDark, isRTL),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  productName,
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? const Color(0xFFF9FAFB) : const Color(0xFF1E293B),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${isRTL ? 'الكمية' : 'Qty'}: $quantity × JOD ${price}',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF64748B),
                   ),
                 ),
               ],
-            )
-          else if (order['status'] == 'processing' || order['status'] == 'shipped')
-            ElevatedButton.icon(
-              icon: const Icon(Icons.local_shipping, size: 18),
-              label: Text(
-                order['status'] == 'processing' 
-                    ? 'Mark as Shipped' 
-                    : 'Mark as Delivered',
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFF9800),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
-              onPressed: () {
-                Navigator.pop(context);
-                _updateOrderStatus(
-                  order['id'].toString(),
-                  order['status'] == 'processing' ? 'shipped' : 'completed',
-                );
-              },
             ),
+          ),
+          Text(
+            'JOD ${total.toStringAsFixed(2)}',
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: DistributorColors(isDark: isDark).primary,
+            ),
+          ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildDeliveryInfoSection(Map<String, dynamic> order, bool isDark, AppLocalizations? locale, bool isRTL) {
+    final shippingAddress = order['shipping_address'] as Map<String, dynamic>? ?? {};
+    final street = shippingAddress['street']?.toString() ?? '';
+    final city = shippingAddress['city']?.toString() ?? '';
+    final state = shippingAddress['state']?.toString() ?? '';
+    final postalCode = shippingAddress['postal_code']?.toString() ?? '';
+    final country = shippingAddress['country']?.toString() ?? '';
+    
+    final fullAddress = [street, city, state, postalCode, country]
+        .where((part) => part.isNotEmpty)
+        .join(', ');
+    
+    final deliveryAddress = fullAddress.isNotEmpty ? fullAddress : 'N/A';
+    final deliveryNotes = order['notes']?.toString() ?? '';
+
+    return _buildSection(
+      title: isRTL ? 'معلومات التوصيل' : 'Delivery Information',
+      isDark: isDark,
+      isRTL: isRTL,
+      child: Column(
+        children: [
+          _buildInfoRow(
+            icon: Icons.location_on_rounded,
+            label: isRTL ? 'عنوان التوصيل' : 'Delivery Address',
+            value: deliveryAddress,
+            isDark: isDark,
+            isRTL: isRTL,
+          ),
+          if (deliveryNotes.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            _buildInfoRow(
+              icon: Icons.note_rounded,
+              label: isRTL ? 'ملاحظات التوصيل' : 'Delivery Notes',
+              value: deliveryNotes,
+              isDark: isDark,
+              isRTL: isRTL,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSection({
+    required String title,
+    required bool isDark,
+    required bool isRTL,
+    required Widget child,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: GoogleFonts.inter(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: isDark ? const Color(0xFFF9FAFB) : const Color(0xFF1E293B),
+          ),
+        ),
+        const SizedBox(height: 16),
+        child,
+      ],
+    );
+  }
+
+  Widget _buildInfoRow({
+    required IconData icon,
+    required String label,
+    required String value,
+    required bool isDark,
+    required bool isRTL,
+    bool isHighlighted = false,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: isHighlighted 
+                ? DistributorColors(isDark: isDark).primary.withOpacity(0.1)
+                : (isDark ? const Color(0xFF1F1F1F) : const Color(0xFFF1F5F9)),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            icon,
+            size: 16,
+            color: isHighlighted 
+                ? DistributorColors(isDark: isDark).primary
+                : (isDark ? const Color(0xFF9CA3AF) : const Color(0xFF64748B)),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF64748B),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                value,
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  fontWeight: isHighlighted ? FontWeight.w600 : FontWeight.w500,
+                  color: isHighlighted 
+                      ? DistributorColors(isDark: isDark).primary
+                      : (isDark ? const Color(0xFFF9FAFB) : const Color(0xFF1E293B)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildOrderDetailsActions(Map<String, dynamic> order, bool isDark, AppLocalizations? locale, bool isRTL) {
+    final status = order['status']?.toString().toLowerCase() ?? '';
+    final distributorColors = DistributorColors(isDark: isDark);
+    
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF111111) : const Color(0xFFF8FAFC),
+        borderRadius: const BorderRadius.only(
+          bottomLeft: Radius.circular(24),
+          bottomRight: Radius.circular(24),
+        ),
+        border: isDark ? Border(
+          top: BorderSide(color: const Color(0xFF1F1F1F)),
+        ) : null,
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              // Close Button
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF64748B),
+                    side: BorderSide(
+                      color: isDark ? const Color(0xFF1F1F1F) : const Color(0xFFE2E8F0),
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                  child: Text(
+                    isRTL ? 'إغلاق' : 'Close',
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+              
+              const SizedBox(width: 12),
+              
+              // Action Button (based on status)
+              Expanded(
+                flex: 2,
+                child: _buildActionButton(order, status, isDark, isRTL, distributorColors),
+              ),
+            ],
+          ),
+          
+          // Additional actions for pending orders
+          if (status == 'pending') ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  _showRejectDialog(order['id'].toString());
+                },
+                icon: Icon(Icons.close_rounded, size: 18),
+                label: Text(
+                  isRTL ? 'رفض الطلب' : 'Reject Order',
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.red,
+                  side: BorderSide(color: Colors.red.withOpacity(0.3)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionButton(Map<String, dynamic> order, String status, bool isDark, bool isRTL, DistributorColors distributorColors) {
+    String buttonText;
+    IconData buttonIcon;
+    VoidCallback? onPressed;
+
+    switch (status) {
+      case 'pending':
+        buttonText = isRTL ? 'قبول الطلب' : 'Accept Order';
+        buttonIcon = Icons.check_rounded;
+        onPressed = () {
+          Navigator.of(context).pop();
+          _updateOrderStatus(order['id'].toString(), 'processing');
+        };
+        break;
+      case 'processing':
+        buttonText = isRTL ? 'شحن الطلب' : 'Ship Order';
+        buttonIcon = Icons.local_shipping_rounded;
+        onPressed = () {
+          Navigator.of(context).pop();
+          _updateOrderStatus(order['id'].toString(), 'shipped');
+        };
+        break;
+      case 'shipped':
+        buttonText = isRTL ? 'تم التسليم' : 'Mark as Delivered';
+        buttonIcon = Icons.done_all_rounded;
+        onPressed = () {
+          Navigator.of(context).pop();
+          _updateOrderStatus(order['id'].toString(), 'completed');
+        };
+        break;
+      default:
+        buttonText = isRTL ? 'عرض التفاصيل' : 'View Details';
+        buttonIcon = Icons.visibility_rounded;
+        onPressed = null;
+    }
+
+    return ElevatedButton.icon(
+      onPressed: onPressed,
+      icon: Icon(buttonIcon, size: 18),
+      label: Text(
+        buttonText,
+        style: GoogleFonts.inter(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: onPressed != null ? distributorColors.primary : (isDark ? const Color(0xFF1F1F1F) : const Color(0xFFE2E8F0)),
+        foregroundColor: onPressed != null ? Colors.white : (isDark ? const Color(0xFF9CA3AF) : const Color(0xFF64748B)),
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 16),
       ),
     );
   }
@@ -718,40 +1081,6 @@ class _IncomingOrdersPageState extends State<IncomingOrdersPage> with TickerProv
     );
   }
 
-  Widget _buildOrderList(List<dynamic> orders, String status) {
-    final filtered = _filterOrdersByQuery(orders);
-
-    return RefreshIndicator(
-      onRefresh: _loadOrders,
-      child: filtered.isEmpty
-          ? ListView(
-              padding: const EdgeInsets.all(24),
-              children: [
-                const SizedBox(height: 48),
-                Icon(
-                  Icons.receipt_long_outlined,
-                  size: 72,
-                  color: Colors.grey[400],
-                ),
-                const SizedBox(height: 16),
-                Center(
-                  child: Text(
-                    _searchQuery.isEmpty ? 'No $status orders yet' : 'No results match your search',
-                    style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-                  ),
-                ),
-              ],
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.all(12),
-              itemCount: filtered.length,
-              itemBuilder: (context, index) {
-                final order = filtered[index];
-                return _buildOrderCard(order, status);
-              },
-            ),
-    );
-  }
 
   List<dynamic> _filterOrdersByQuery(List<dynamic> orders) {
     if (_searchQuery.trim().isEmpty) return orders;
@@ -764,238 +1093,78 @@ class _IncomingOrdersPageState extends State<IncomingOrdersPage> with TickerProv
     }).toList();
   }
 
-  Widget _buildOrderCard(Map<String, dynamic> order, String status) {
-    final dateFormat = DateFormat('MMM dd, yyyy - hh:mm a');
-    final orderDate = order['created_at'] != null 
-        ? DateTime.parse(order['created_at'])
-        : DateTime.now();
-    
-    // Safe data extraction with fallbacks
-    final orderId = order['id']?.toString() ?? 'Unknown';
-    final buyerName = order['buyer']?['name'] ?? 'Unknown Customer';
-    final items = order['items'] as List<dynamic>? ?? [];
-    final totalAmount = double.tryParse(order['total_amount']?.toString() ?? '0') ?? 0.0;
-    
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 0),
-      elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      color: Colors.white,
-      child: InkWell(
-        onTap: () {
-          // Navigate to order details
-          _showOrderDetails(order);
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Order Header
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF5F1E8),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      '#$orderId',
-                      style: const TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                  ),
-                  const Spacer(),
-                  _buildStatusChip(status),
-                ],
-              ),
-              const SizedBox(height: 8),
-              
-              // Order Info
-              Text(
-                'Date: ${dateFormat.format(orderDate)}',
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontSize: 14,
-                ),
-              ),
-              const SizedBox(height: 4),
-              
-              // Customer Info
-              Text(
-                'Customer: $buyerName',
-                style: const TextStyle(fontSize: 14),
-              ),
-              
-              const SizedBox(height: 8),
-              
-              // Order Summary
-              if (items.isNotEmpty)
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '${items.length} ${items.length == 1 ? 'item' : 'items'}:',
-                      style: const TextStyle(fontWeight: FontWeight.w500),
-                    ),
-                    const SizedBox(height: 4),
-                    ...items.take(2).map<Widget>((item) => Padding(
-                      padding: const EdgeInsets.only(left: 8.0, top: 2),
-                      child: Text(
-                        '• ${item['quantity']}x ${item['product']?['name'] ?? 'Product'}',
-                        style: const TextStyle(fontSize: 13),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    )).toList(),
-                    if (items.length > 2)
-                      Padding(
-                        padding: const EdgeInsets.only(left: 8.0, top: 2),
-                        child: Text(
-                          '+ ${items.length - 2} more items',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
-                            fontStyle: FontStyle.italic,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              
-              const SizedBox(height: 8),
-              
-              // Order Total
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Total:',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
-                  Text(
-                    '\$${totalAmount.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                      color: const Color(0xFFFF9800),
-                    ),
-                  ),
-                ],
-              ),
-              
-              // Action Buttons
-              if (status == 'pending')
-                Padding(
-                  padding: const EdgeInsets.only(top: 12),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          icon: const Icon(Icons.check_circle_outline, size: 18),
-                          label: const Text('Accept'),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.green,
-                            side: const BorderSide(color: Colors.green),
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                          ),
-                          onPressed: () => _updateOrderStatus(orderId, 'processing'),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          icon: const Icon(Icons.local_shipping, size: 18),
-                          label: const Text('Assign'),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFFFF9800),
-                            side: const BorderSide(color: const Color(0xFFFF9800)),
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                          ),
-                          onPressed: () => _showAssignDeliveryDialog(orderId),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          icon: const Icon(Icons.cancel_outlined, size: 18),
-                          label: const Text('Reject'),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.red,
-                            side: const BorderSide(color: Colors.red),
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                          ),
-                          onPressed: () => _showRejectDialog(orderId),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              
-              if (status == 'processing')
-                Padding(
-                  padding: const EdgeInsets.only(top: 12),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          icon: const Icon(Icons.local_shipping, size: 18),
-                          label: const Text('Mark as Shipped'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFFF9800),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                          ),
-                          onPressed: () => _updateOrderStatus(orderId, 'shipped'),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final locale = AppLocalizations.of(context);
+    final distributorColors = DistributorColors(isDark: isDark);
+    final textColor = isDark ? const Color(0xFFF9FAFB) : const Color(0xFF1E293B);
+    final subtextColor = isDark ? const Color(0xFF9CA3AF) : const Color(0xFF64748B);
+
     if (_isLoading) {
-      return const Scaffold(
+      return Scaffold(
+        backgroundColor: isDark ? const Color(0xFF000000) : const Color(0xFFF8FAFC),
         body: Center(
-          child: LoadingWidget(),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(color: distributorColors.primary),
+              const SizedBox(height: 16),
+              Text(
+                locale?.isRTL == true ? 'جاري تحميل الطلبات...' : 'Loading orders...',
+                style: GoogleFonts.inter(fontSize: 14, color: subtextColor),
+              ),
+            ],
+          ),
         ),
       );
     }
 
     if (_errorMessage != null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Incoming Orders')),
+        backgroundColor: isDark ? const Color(0xFF000000) : const Color(0xFFF8FAFC),
+        appBar: AppBar(
+          elevation: 0,
+          backgroundColor: isDark ? const Color(0xFF000000) : const Color(0xFFF8FAFC),
+          foregroundColor: textColor,
+          automaticallyImplyLeading: false,
+          title: Text(
+            locale?.isRTL == true ? 'الطلبات الواردة' : 'Incoming Orders',
+            style: GoogleFonts.inter(
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+              color: textColor,
+            ),
+          ),
+        ),
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.wifi_off_rounded, size: 64, color: Colors.redAccent),
+                Icon(Icons.wifi_off_rounded, size: 64, color: Colors.redAccent),
                 const SizedBox(height: 16),
                 Text(
                   _errorMessage!,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 16),
+                  style: GoogleFonts.inter(fontSize: 16, color: textColor),
                 ),
                 const SizedBox(height: 16),
                 ElevatedButton.icon(
                   onPressed: _loadOrders,
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('Try Again'),
+                  icon: const Icon(Icons.refresh, size: 18),
+                  label: Text(
+                    locale?.isRTL == true ? 'إعادة المحاولة' : 'Retry',
+                    style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600),
+                  ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFF9800),
+                    backgroundColor: distributorColors.primary,
                     foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                 ),
               ],
@@ -1004,137 +1173,571 @@ class _IncomingOrdersPageState extends State<IncomingOrdersPage> with TickerProv
         ),
       );
     }
-
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     
     return Scaffold(
-      backgroundColor: isDark ? Colors.black : Colors.white,
+      backgroundColor: isDark ? const Color(0xFF000000) : const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: const Text('Incoming Orders'),
+        elevation: 0,
+        backgroundColor: isDark ? const Color(0xFF000000) : const Color(0xFFF8FAFC),
+        foregroundColor: textColor,
+        automaticallyImplyLeading: false,
+        title: Text(
+          locale?.isRTL == true ? 'الطلبات الواردة' : 'Incoming Orders',
+          style: GoogleFonts.inter(
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+            color: textColor,
+          ),
+        ),
         actions: [
           IconButton(
             onPressed: _loadOrders,
-            icon: const Icon(Icons.refresh),
-            tooltip: 'Refresh',
+            icon: Icon(Icons.refresh_rounded, color: textColor),
+            tooltip: locale?.isRTL == true ? 'تحديث' : 'Refresh',
           ),
         ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(108),
-          child: Column(
-            children: [
-              _buildSummaryHeader(),
-              TabBar(
-                controller: _tabController,
-                isScrollable: true,
-                indicatorColor: const Color(0xFFFF9800),
-                tabs: [
-                  Tab(text: 'Pending (${_pendingOrders.length})'),
-                  Tab(text: 'Processing (${_processingOrders.length})'),
-                  Tab(text: 'Completed (${_completedOrders.length})'),
-                  Tab(text: 'Cancelled (${_cancelledOrders.length})'),
-                ],
-              ),
-              const SizedBox(height: 8),
-            ],
-          ),
-        ),
       ),
-      body: Column(
-        children: [
-          _buildSearchBar(),
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildOrderList(_pendingOrders, 'pending'),
-                _buildOrderList(_processingOrders, 'processing'),
-                _buildOrderList(_completedOrders, 'completed'),
-                _buildOrderList(_cancelledOrders, 'cancelled'),
-              ],
+      body: CustomScrollView(
+        physics: const BouncingScrollPhysics(),
+        slivers: [
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+              child: _buildSearchSection(context, isDark, locale, textColor, subtextColor),
             ),
           ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+              child: _buildTabSection(context, isDark, locale, distributorColors, textColor),
+            ),
+          ),
+          _buildOrdersList(context, isDark, locale, distributorColors, textColor, subtextColor),
         ],
       ),
     );
   }
 
-  Widget _buildSummaryHeader() {
-    final total = _pendingOrders.length + _processingOrders.length + _completedOrders.length + _cancelledOrders.length;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-      child: Row(
-        children: [
-          _buildStatChip('Total', total, Colors.blue),
-          const SizedBox(width: 8),
-          _buildStatChip('Pending', _pendingOrders.length, Colors.orange),
-          const SizedBox(width: 8),
-          _buildStatChip('Processing', _processingOrders.length, Colors.blue),
-        ],
-      ),
-    );
-  }
 
-  Widget _buildStatChip(String label, int count, Color color) {
+
+  // Search section
+  Widget _buildSearchSection(BuildContext context, bool isDark, AppLocalizations? locale, Color textColor, Color subtextColor) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.2)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            '$label: $count',
-            style: TextStyle(color: color, fontWeight: FontWeight.w600),
+        color: isDark ? const Color(0xFF0A0A0A) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: isDark ? Border.all(color: const Color(0xFF1F1F1F)) : null,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildSearchBar() {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       child: TextField(
         controller: _searchController,
-        onChanged: (v) => setState(() => _searchQuery = v),
+        style: GoogleFonts.inter(color: textColor, fontSize: 16),
         decoration: InputDecoration(
-          hintText: 'Search by order ID, customer, or status',
-          prefixIcon: const Icon(Icons.search),
-          suffixIcon: _searchQuery.isEmpty
-              ? null
-              : IconButton(
-                  icon: const Icon(Icons.clear),
+          hintText: locale?.isRTL == true ? 'البحث برقم الطلب أو العميل أو الحالة' : 'Search by order ID, customer, or status',
+          hintStyle: GoogleFonts.inter(color: subtextColor, fontSize: 16),
+          prefixIcon: Icon(Icons.search_rounded, color: subtextColor, size: 20),
+          suffixIcon: _searchQuery.isNotEmpty
+              ? IconButton(
+                  icon: Icon(Icons.clear_rounded, color: textColor, size: 20),
                   onPressed: () {
                     _searchController.clear();
                     setState(() => _searchQuery = '');
                   },
+                )
+              : null,
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.all(20),
+        ),
+        onChanged: (value) => setState(() => _searchQuery = value),
+      ),
+    );
+  }
+
+  // Tab section
+  Widget _buildTabSection(BuildContext context, bool isDark, AppLocalizations? locale, DistributorColors distributorColors, Color textColor) {
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0A0A0A) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: isDark ? Border.all(color: const Color(0xFF1F1F1F)) : null,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: TabBar(
+        controller: _tabController,
+        isScrollable: true,
+        indicatorSize: TabBarIndicatorSize.tab,
+        indicator: BoxDecoration(
+          color: distributorColors.primary,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        labelColor: Colors.white,
+        unselectedLabelColor: textColor,
+        labelStyle: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600),
+        unselectedLabelStyle: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500),
+        padding: const EdgeInsets.all(4),
+        tabs: [
+          Tab(text: locale?.isRTL == true ? 'معلقة (${_pendingOrders.length})' : 'Pending (${_pendingOrders.length})'),
+          Tab(text: locale?.isRTL == true ? 'قيد المعالجة (${_processingOrders.length})' : 'Processing (${_processingOrders.length})'),
+          Tab(text: locale?.isRTL == true ? 'مكتملة (${_completedOrders.length})' : 'Completed (${_completedOrders.length})'),
+          Tab(text: locale?.isRTL == true ? 'ملغاة (${_cancelledOrders.length})' : 'Cancelled (${_cancelledOrders.length})'),
+        ],
+      ),
+    );
+  }
+
+  // Orders list
+  Widget _buildOrdersList(BuildContext context, bool isDark, AppLocalizations? locale, DistributorColors distributorColors, Color textColor, Color subtextColor) {
+    return SliverFillRemaining(
+      child: TabBarView(
+        controller: _tabController,
+        children: [
+          _buildCleanOrderList(_pendingOrders, 'pending', isDark, locale, distributorColors, textColor, subtextColor),
+          _buildCleanOrderList(_processingOrders, 'processing', isDark, locale, distributorColors, textColor, subtextColor),
+          _buildCleanOrderList(_completedOrders, 'completed', isDark, locale, distributorColors, textColor, subtextColor),
+          _buildCleanOrderList(_cancelledOrders, 'cancelled', isDark, locale, distributorColors, textColor, subtextColor),
+        ],
+      ),
+    );
+  }
+
+  // Clean order list
+  Widget _buildCleanOrderList(List<dynamic> orders, String status, bool isDark, AppLocalizations? locale, DistributorColors distributorColors, Color textColor, Color subtextColor) {
+    final filtered = _filterOrdersByQuery(orders);
+
+    if (filtered.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(40),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.receipt_long_outlined,
+                size: 72,
+                color: subtextColor.withOpacity(0.5),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                _searchQuery.isEmpty 
+                    ? (locale?.isRTL == true ? 'لا توجد طلبات $status بعد' : 'No $status orders yet')
+                    : (locale?.isRTL == true ? 'لا توجد نتائج تطابق البحث' : 'No results match your search'),
+                style: GoogleFonts.inter(fontSize: 16, color: subtextColor),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadOrders,
+      color: distributorColors.primary,
+      child: ListView.builder(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
+        itemCount: filtered.length,
+        itemBuilder: (context, index) {
+          final order = filtered[index];
+          return _buildCleanOrderCard(order, status, isDark, locale, distributorColors, textColor, subtextColor);
+        },
+      ),
+    );
+  }
+
+  // Clean order card matching the design
+  Widget _buildCleanOrderCard(Map<String, dynamic> order, String status, bool isDark, AppLocalizations? locale, DistributorColors distributorColors, Color textColor, Color subtextColor) {
+    final orderDate = order['created_at'] != null 
+        ? DateTime.parse(order['created_at'])
+        : DateTime.now();
+    
+    final orderId = order['id']?.toString() ?? 'Unknown';
+    final buyerName = order['buyer']?['name'] ?? (locale?.isRTL == true ? 'عميل غير معروف' : 'Unknown Customer');
+    final items = order['items'] as List<dynamic>? ?? [];
+    final totalAmount = double.tryParse(order['total_amount']?.toString() ?? '0') ?? 0.0;
+    
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0A0A0A) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: isDark ? Border.all(color: const Color(0xFF1F1F1F)) : null,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: InkWell(
+        onTap: () => _showOrderDetails(order),
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Status and date header
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _buildCleanStatusChip(status, isDark, locale, distributorColors),
+                  Text(
+                    locale?.isRTL == true ? 'اليوم • ${DateFormat('h:mm a').format(orderDate)}' : 'Today • ${DateFormat('h:mm a').format(orderDate)}',
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      color: subtextColor,
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                ],
+              ),
+              
+              const SizedBox(height: 16),
+              
+              // Restaurant/Store info row
+              Row(
+                children: [
+                  // Store logo placeholder
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: distributorColors.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: distributorColors.primary.withOpacity(0.2)),
+                    ),
+                    child: Icon(
+                      Icons.store_rounded,
+                      color: distributorColors.primary,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  
+                  // Store name and order info
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          buyerName,
+                          style: GoogleFonts.inter(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: textColor,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${locale?.isRTL == true ? 'رقم الطلب' : 'Order ID'}: $orderId',
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            color: subtextColor,
+                            fontWeight: FontWeight.w400,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  // Dropdown arrow
+                  Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    color: subtextColor,
+                    size: 24,
+                  ),
+                ],
+              ),
+              
+              const SizedBox(height: 16),
+              
+              // Order total
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'JOD ${totalAmount.toStringAsFixed(2)}',
+                    style: GoogleFonts.inter(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: textColor,
+                    ),
+                  ),
+                  Text(
+                    '${items.length} ${locale?.isRTL == true ? 'عنصر' : 'Item${items.length != 1 ? 's' : ''}'}',
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      color: subtextColor,
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                ],
+              ),
+              
+              const SizedBox(height: 16),
+              
+              // Action buttons row
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => _showOrderDetails(order),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: textColor,
+                        side: BorderSide(color: isDark ? const Color(0xFF1F1F1F) : const Color(0xFFE5E7EB)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      child: Text(
+                        locale?.isRTL == true ? 'عرض التفاصيل' : 'View details',
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  if (status == 'pending') ...[
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () => _updateOrderStatus(orderId, 'processing'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: distributorColors.primary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          elevation: 0,
+                        ),
+                        child: Text(
+                          locale?.isRTL == true ? 'قبول الطلب' : 'Accept Order',
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ] else if (status == 'processing') ...[
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () => _updateOrderStatus(orderId, 'shipped'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: distributorColors.primary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          elevation: 0,
+                        ),
+                        child: Text(
+                          locale?.isRTL == true ? 'شحن الطلب' : 'Ship Order',
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ] else ...[
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () => _updateOrderStatus(orderId, 'processing'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: isDark ? const Color(0xFF1F1F1F) : const Color(0xFFF1F5F9),
+                          foregroundColor: textColor,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          elevation: 0,
+                        ),
+                        child: Text(
+                          locale?.isRTL == true ? 'طلب مرة أخرى' : 'Order again',
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              
+              // Rating section for completed orders
+              if (status == 'completed' || status == 'delivered') ...[
+                const SizedBox(height: 16),
+                Divider(color: isDark ? const Color(0xFF1F1F1F) : const Color(0xFFE5E7EB)),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Text(
+                      locale?.isRTL == true ? 'تقييم' : 'Rate',
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: textColor,
+                      ),
+                    ),
+                    const Spacer(),
+                    Row(
+                      children: List.generate(5, (index) => 
+                        Icon(
+                          Icons.star_border_rounded,
+                          color: subtextColor.withOpacity(0.5),
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-          filled: true,
-          fillColor: const Color(0xFFF5F1E8),
-          contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 12),
-          border: OutlineInputBorder(
-            borderSide: BorderSide(color: Colors.grey.shade300),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderSide: BorderSide(color: Colors.grey.shade300),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderSide: const BorderSide(color: Color(0xFFFF9800), width: 2),
-            borderRadius: BorderRadius.circular(12),
+              ],
+            ],
           ),
         ),
       ),
     );
   }
+
+  Widget _buildCleanStatusChip(String status, bool isDark, AppLocalizations? locale, DistributorColors distributorColors) {
+    final lower = status.toLowerCase();
+    Color color;
+    String label;
+    
+    switch (lower) {
+      case 'pending':
+      case 'new':
+      case 'awaiting':
+      case 'awaiting_confirmation':
+        color = Colors.orange;
+        label = locale?.isRTL == true ? 'معلقة' : 'Pending';
+        break;
+      case 'processing':
+      case 'accepted':
+      case 'packed':
+      case 'shipped':
+      case 'out_for_delivery':
+        color = Colors.blue;
+        label = locale?.isRTL == true ? 'قيد المعالجة' : 'Processing';
+        break;
+      case 'completed':
+      case 'delivered':
+        color = Colors.green;
+        label = locale?.isRTL == true ? 'مكتملة' : 'Delivered';
+        break;
+      case 'cancelled':
+      case 'canceled':
+      case 'rejected':
+      case 'failed':
+        color = Colors.red;
+        label = locale?.isRTL == true ? 'ملغاة' : 'Cancelled';
+        break;
+      default:
+        color = Colors.grey;
+        label = status;
+    }
+    
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        label,
+        style: GoogleFonts.inter(
+          color: color,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProductImage(Map<String, dynamic> item, Map<String, dynamic> product, bool isDark, bool isRTL) {
+    // Try multiple possible image field names
+    final imageUrl = product['image_url']?.toString() ?? 
+                    product['image']?.toString() ?? 
+                    product['picture']?.toString() ?? 
+                    product['photo']?.toString() ?? 
+                    item['product_image']?.toString() ?? 
+                    item['image_url']?.toString() ?? 
+                    item['image']?.toString() ?? '';
+
+    print('🖼️ Product Image URL: $imageUrl');
+    print('🔍 Product data: ${product.toString()}');
+    print('🔍 Item data: ${item.toString()}');
+
+    if (imageUrl.isNotEmpty && Uri.tryParse(imageUrl) != null) {
+      return Image.network(
+        imageUrl,
+        width: 46,
+        height: 46,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          print('❌ Failed to load image: $imageUrl');
+          print('❌ Error: $error');
+          return _buildFallbackIcon(isDark);
+        },
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF2D2D2D) : const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(11),
+            ),
+            child: Center(
+              child: SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: DistributorColors(isDark: isDark).primary,
+                ),
+              ),
+            ),
+          );
+        },
+      );
+    } else {
+      return _buildFallbackIcon(isDark);
+    }
+  }
+
+  Widget _buildFallbackIcon(bool isDark) {
+    return Container(
+      width: 46,
+      height: 46,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            DistributorColors(isDark: isDark).primary,
+            DistributorColors(isDark: isDark).primary.withOpacity(0.8),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(11),
+      ),
+      child: Icon(
+        Icons.inventory_2_rounded,
+        color: Colors.white,
+        size: 24,
+      ),
+    );
+  }
+
 }
